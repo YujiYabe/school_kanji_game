@@ -7,6 +7,9 @@ private data class CsvKanjiSeed(
     val target: String,
     val reading: String,
     val sentence: String,
+    val markedSentence: String,
+    val sentenceReading: String,
+    val markedSentenceReading: String,
 )
 
 fun loadKanjiQuestionsFromCsv(
@@ -31,6 +34,9 @@ fun loadKanjiQuestionsFromCsv(
             id = "csv_${seed.grade}_${index}_${seed.target}",
             grade = seed.grade,
             fullSentence = seed.sentence,
+            sentenceReading = seed.sentenceReading,
+            markedSentence = seed.markedSentence,
+            markedSentenceReading = seed.markedSentenceReading,
             targetText = seed.target,
             readingAnswers = listOf(seed.reading) + distractors,
             writingAnswer = seed.target,
@@ -47,15 +53,24 @@ private fun parseCsvKanjiSeed(line: String): CsvKanjiSeed? {
     val grade = columns[0].toIntOrNull() ?: return null
     val target = columns[1]
     val reading = columns[2]
-    val sentence = columns[3].replace("[$target]", target)
+    val markedSentence = columns[3]
+    val markedSentenceReading = columns.getOrNull(4).orEmpty()
+    val sentence = markedSentence.stripRubyMarkers()
+    val sentenceReading = markedSentenceReading.stripRubyMarkers()
 
     return CsvKanjiSeed(
         grade = grade,
         target = target,
         reading = reading,
         sentence = sentence,
+        markedSentence = markedSentence,
+        sentenceReading = sentenceReading,
+        markedSentenceReading = markedSentenceReading,
     )
 }
+
+private fun String.stripRubyMarkers(): String =
+    filterNot { it == '[' || it == ']' || it == '{' || it == '}' }
 
 private fun parseCsvLine(line: String): List<String> {
     val columns = mutableListOf<String>()

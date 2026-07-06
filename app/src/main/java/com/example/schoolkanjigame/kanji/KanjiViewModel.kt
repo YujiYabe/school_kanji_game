@@ -32,6 +32,9 @@ data class KanjiQuestion(
     val id: String,
     val grade: Int,
     val fullSentence: String,
+    val sentenceReading: String = "",
+    val markedSentence: String = "",
+    val markedSentenceReading: String = "",
     val targetText: String,
     val readingAnswers: List<String>,
     val writingAnswer: String,
@@ -199,17 +202,20 @@ class KanjiViewModel(
     private val recognizerClient: DigitalInkRecognizerClient,
     private val questionBank: List<KanjiQuestion>,
     private val questionAttemptStore: QuestionAttemptStore,
+    private val settingsStore: KanjiSettingsStore,
 ) : ViewModel() {
     constructor() : this(
         recognizerClient = JapaneseMlKitDigitalInkRecognizerClient(),
         questionBank = emptyList(),
         questionAttemptStore = InMemoryQuestionAttemptStore(),
+        settingsStore = InMemoryKanjiSettingsStore(),
     )
 
     companion object {
         fun factory(
             questionBank: List<KanjiQuestion>,
             questionAttemptStore: QuestionAttemptStore,
+            settingsStore: KanjiSettingsStore,
         ): ViewModelProvider.Factory =
             object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
@@ -218,14 +224,28 @@ class KanjiViewModel(
                         recognizerClient = JapaneseMlKitDigitalInkRecognizerClient(),
                         questionBank = questionBank,
                         questionAttemptStore = questionAttemptStore,
+                        settingsStore = settingsStore,
                     ) as T
             }
     }
 
+    private val initialSettings = settingsStore.loadSettings()
+
     private val _uiState = MutableStateFlow(
         KanjiUiState(
-            questions = buildQuestionsForGrade(grade = 1, count = 10),
-            shuffledReadingAnswers = questionsForGrade(1).firstOrNull()?.readingAnswers.orEmpty().shuffled(),
+            selectedGrade = initialSettings.selectedGrade,
+            questionCount = initialSettings.questionCount,
+            readingSecondsPerQuestion = initialSettings.readingSecondsPerQuestion,
+            readingTimeRemaining = initialSettings.readingSecondsPerQuestion,
+            questions = buildQuestionsForGrade(
+                grade = initialSettings.selectedGrade,
+                count = initialSettings.questionCount,
+            ),
+            shuffledReadingAnswers = questionsForGrade(initialSettings.selectedGrade)
+                .firstOrNull()
+                ?.readingAnswers
+                .orEmpty()
+                .shuffled(),
         ),
     )
     val uiState: StateFlow<KanjiUiState> = _uiState.asStateFlow()
@@ -235,6 +255,7 @@ class KanjiViewModel(
 
     fun setSelectedGrade(grade: Int) {
         val safeGrade = grade.coerceIn(1, 6)
+        settingsStore.saveSelectedGrade(safeGrade)
         _uiState.update { state ->
             val previewQuestions = buildQuestionsForGrade(safeGrade, state.questionCount)
             state.copy(
@@ -247,6 +268,7 @@ class KanjiViewModel(
 
     fun setReadingSecondsPerQuestion(seconds: Int) {
         val safeSeconds = seconds.coerceIn(1, 30)
+        settingsStore.saveReadingSecondsPerQuestion(safeSeconds)
         _uiState.update {
             it.copy(
                 readingSecondsPerQuestion = safeSeconds,
@@ -257,6 +279,7 @@ class KanjiViewModel(
 
     fun setQuestionCount(count: Int) {
         val safeCount = count.coerceIn(5, 100)
+        settingsStore.saveQuestionCount(safeCount)
         _uiState.update { state ->
             val previewQuestions = buildQuestionsForGrade(state.selectedGrade, safeCount)
             state.copy(
@@ -688,6 +711,76 @@ private fun List<String>.withoutRejectedWritingCandidates(expected: String): Lis
 
 private fun Char.isKana(): Boolean =
     this in '\u3040'..'\u309F' || this in '\u30A0'..'\u30FF'
+
+data class KanjiSettings(
+    val selectedGrade: Int = 1,
+    val questionCount: Int = 10,
+    val readingSecondsPerQuestion: Int = 10,
+)
+
+interface KanjiSettingsStore {
+    fun loadSettings(): KanjiSettings
+    fun saveSelectedGrade(selectedGrade: Int)
+    fun saveQuestionCount(questionCount: Int)
+    fun saveReadingSecondsPerQuestion(readingSecondsPerQuestion: Int)
+}
+
+class SharedPreferencesKanjiSettingsStore(
+    private val sharedPreferences: SharedPreferences,
+) : KanjiSettingsStore {
+    override fun loadSettings(): KanjiSettings =
+        KanjiSettings(
+            selectedGrade = sharedPreferences.getInt(KEY_SELECTED_GRADE, 1).coerceIn(1, 6),
+            questionCount = sharedPreferences.getInt(KEY_QUESTION_COUNT, 10).coerceIn(5, 100),
+            readingSecondsPerQuestion = sharedPreferences
+                .getInt(KEY_READING_SECONDS_PER_QUESTION, 10)
+                .coerceIn(1, 30),
+        )
+
+    override fun saveSelectedGrade(selectedGrade: Int) {
+        sharedPreferences.edit()
+            .putInt(KEY_SELECTED_GRADE, selectedGrade.coerceIn(1, 6))
+            .apply()
+    }
+
+    override fun saveQuestionCount(questionCount: Int) {
+        sharedPreferences.edit()
+            .putInt(KEY_QUESTION_COUNT, questionCount.coerceIn(5, 100))
+            .apply()
+    }
+
+    override fun saveReadingSecondsPerQuestion(readingSecondsPerQuestion: Int) {
+        sharedPreferences.edit()
+            .putInt(KEY_READING_SECONDS_PER_QUESTION, readingSecondsPerQuestion.coerceIn(1, 30))
+            .apply()
+    }
+
+    private companion object {
+        const val KEY_SELECTED_GRADE = "selected_grade"
+        const val KEY_QUESTION_COUNT = "question_count"
+        const val KEY_READING_SECONDS_PER_QUESTION = "reading_seconds_per_question"
+    }
+}
+
+private class InMemoryKanjiSettingsStore : KanjiSettingsStore {
+    private var settings = KanjiSettings()
+
+    override fun loadSettings(): KanjiSettings = settings
+
+    override fun saveSelectedGrade(selectedGrade: Int) {
+        settings = settings.copy(selectedGrade = selectedGrade.coerceIn(1, 6))
+    }
+
+    override fun saveQuestionCount(questionCount: Int) {
+        settings = settings.copy(questionCount = questionCount.coerceIn(5, 100))
+    }
+
+    override fun saveReadingSecondsPerQuestion(readingSecondsPerQuestion: Int) {
+        settings = settings.copy(
+            readingSecondsPerQuestion = readingSecondsPerQuestion.coerceIn(1, 30),
+        )
+    }
+}
 
 interface QuestionAttemptStore {
     fun attemptCount(questionId: String): Int

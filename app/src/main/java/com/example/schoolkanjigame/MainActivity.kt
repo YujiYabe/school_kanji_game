@@ -15,6 +15,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.schoolkanjigame.kanji.KanjiScreen
 import com.example.schoolkanjigame.kanji.KanjiViewModel
+import com.example.schoolkanjigame.kanji.SharedPreferencesKanjiSettingsStore
 import com.example.schoolkanjigame.kanji.SharedPreferencesQuestionAttemptStore
 import com.example.schoolkanjigame.kanji.loadKanjiQuestionsFromCsv
 
@@ -44,8 +45,16 @@ private fun SchoolKanjiGameApp() {
                     ),
                 )
             }
+            val settingsStore = remember(context) {
+                SharedPreferencesKanjiSettingsStore(
+                    context.applicationContext.getSharedPreferences(
+                        "kanji_settings",
+                        Context.MODE_PRIVATE,
+                    ),
+                )
+            }
             val viewModel: KanjiViewModel = viewModel(
-                factory = KanjiViewModel.factory(questionBank, questionAttemptStore),
+                factory = KanjiViewModel.factory(questionBank, questionAttemptStore, settingsStore),
             )
             KanjiScreen(
                 viewModel = viewModel,

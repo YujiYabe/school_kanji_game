@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -53,8 +55,10 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -384,9 +388,14 @@ private fun ReadingQuizScreen(
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.secondary,
         )
-        Text(
-            text = highlightedSentence(question.fullSentence, question.targetText),
-            style = MaterialTheme.typography.headlineSmall,
+        RubySentence(
+            sentence = question.fullSentence,
+            sentenceReading = question.sentenceReading,
+            markedSentence = question.markedSentence,
+            markedSentenceReading = question.markedSentenceReading,
+            targetText = question.targetText,
+            targetReading = question.readingAnswers.firstOrNull().orEmpty(),
+            modifier = Modifier.fillMaxWidth(),
         )
         Spacer(modifier = Modifier.weight(1f))
         LazyVerticalGrid(
@@ -431,9 +440,12 @@ private fun WritingQuizScreen(
             text = "書き ${uiState.currentQuestionIndex + 1} / ${uiState.questions.size}",
             style = MaterialTheme.typography.titleMedium,
         )
-        Text(
-            text = highlightedSentence(writingPrompt, writingTargetReading),
-            style = MaterialTheme.typography.headlineSmall,
+        RubySentence(
+            sentence = writingPrompt,
+            sentenceReading = question.sentenceReading,
+            targetText = writingTargetReading,
+            targetReading = writingTargetReading,
+            modifier = Modifier.fillMaxWidth(),
         )
         Text(
             text = "${uiState.currentWritingCharIndex + 1}文字目 / ${question.writingAnswer.length}文字中",
@@ -859,6 +871,321 @@ private fun InkModelStatus(modelState: InkModelState) {
         )
     }
 }
+
+private data class RubyToken(
+    val text: String,
+    val ruby: String = "",
+    val isTarget: Boolean = false,
+)
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun RubySentence(
+    sentence: String,
+    sentenceReading: String,
+    markedSentence: String = "",
+    markedSentenceReading: String = "",
+    targetText: String,
+    targetReading: String = targetText,
+    modifier: Modifier = Modifier,
+    textColor: Color = Color.Unspecified,
+    targetColor: Color = Color(0xFF2563EB),
+    textSize: TextUnit = 24.sp,
+) {
+    val tokens = remember(sentence, sentenceReading, markedSentence, markedSentenceReading, targetText, targetReading) {
+        rubyTokens(
+            sentence = sentence,
+            sentenceReading = sentenceReading,
+            markedSentence = markedSentence,
+            markedSentenceReading = markedSentenceReading,
+            targetText = targetText,
+            targetReading = targetReading,
+        )
+    }
+
+    FlowRow(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(1.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        tokens.forEachIndexed { index, token ->
+            RubyTokenText(
+                token = token,
+                textColor = textColor,
+                targetColor = targetColor,
+                textSize = textSize,
+                modifier = Modifier.padding(end = if (index == tokens.lastIndex) 0.dp else 1.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun RubyTokenText(
+    token: RubyToken,
+    textColor: Color,
+    targetColor: Color,
+    textSize: TextUnit,
+    modifier: Modifier = Modifier,
+) {
+    val bodyColor = if (token.isTarget) targetColor else textColor
+    val bodyWeight = if (token.isTarget) FontWeight.Bold else FontWeight.Normal
+    val rubyText = token.ruby.ifEmpty { "　" }
+
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Bottom,
+    ) {
+        Text(
+            text = rubyText,
+            fontSize = 10.sp,
+            lineHeight = 10.sp,
+            color = if (token.ruby.isBlank()) Color.Transparent else MaterialTheme.colorScheme.secondary,
+            maxLines = 1,
+            overflow = TextOverflow.Visible,
+        )
+        Text(
+            text = token.text,
+            fontSize = textSize,
+            lineHeight = 30.sp,
+            color = bodyColor,
+            fontWeight = bodyWeight,
+        )
+    }
+}
+
+private fun rubyTokens(
+    sentence: String,
+    sentenceReading: String,
+    markedSentence: String,
+    markedSentenceReading: String,
+    targetText: String,
+    targetReading: String,
+): List<RubyToken> {
+    if (sentence.isBlank()) return emptyList()
+    explicitRubyTokens(markedSentence, markedSentenceReading)
+        ?.let { return it.mergePlainNeighbors() }
+    if (sentenceReading.isBlank()) return targetOnlyTokens(sentence, targetText)
+
+    val targetStart = sentence.indexOf(targetText).takeIf { it >= 0 && targetText.isNotEmpty() }
+    val targetRange = targetStart?.let { it until it + targetText.length } ?: IntRange.EMPTY
+    val tokens = mutableListOf<RubyToken>()
+    var sentenceIndex = 0
+    var readingIndex = 0
+
+    while (sentenceIndex < sentence.length) {
+        val char = sentence[sentenceIndex]
+        if (!char.isKanji()) {
+            tokens.add(RubyToken(char.toString()))
+            if (readingIndex < sentenceReading.length && sentenceReading[readingIndex].matchesReadingAnchor(char)) {
+                readingIndex++
+            }
+            sentenceIndex++
+            continue
+        }
+
+        val runStart = sentenceIndex
+        while (
+            sentenceIndex < sentence.length &&
+            sentence[sentenceIndex].isKanji()
+        ) {
+            sentenceIndex++
+        }
+        val runEnd = sentenceIndex
+        val runText = sentence.substring(runStart, runEnd)
+        val nextAnchor = sentence.drop(sentenceIndex).firstOrNull { !it.isKanji() }
+        val rubyEnd = if (nextAnchor == null) {
+            sentenceReading.length
+        } else {
+            sentenceReading.indexOfReadingAnchor(nextAnchor, startIndex = readingIndex)
+                .takeIf { it >= readingIndex }
+                ?: readingIndex
+        }
+        val runReading = sentenceReading.substring(readingIndex, rubyEnd)
+        readingIndex = rubyEnd
+
+        if (targetStart != null && targetStart in runStart until runEnd) {
+            tokens.addTargetRunTokens(
+                runText = runText,
+                runReading = runReading,
+                targetOffset = targetStart - runStart,
+                targetText = targetText,
+                targetReading = targetReading,
+            )
+        } else {
+            tokens.add(RubyToken(text = runText, ruby = runReading))
+        }
+    }
+
+    return tokens.mergePlainNeighbors()
+}
+
+private data class MarkedSegment(
+    val text: String,
+    val marker: Char? = null,
+)
+
+private fun explicitRubyTokens(
+    markedSentence: String,
+    markedSentenceReading: String,
+): List<RubyToken>? {
+    if (!markedSentence.hasRubyMarkers() || !markedSentenceReading.hasRubyMarkers()) return null
+
+    val sentenceSegments = markedSentence.toMarkedSegments() ?: return null
+    val readingSegments = markedSentenceReading.toMarkedSegments() ?: return null
+    val readingMarkedSegments = readingSegments.filter { it.marker != null }
+    var readingMarkerIndex = 0
+
+    return buildList {
+        sentenceSegments.forEach { sentenceSegment ->
+            when (sentenceSegment.marker) {
+                '[' -> {
+                    val readingSegment = readingMarkedSegments.getOrNull(readingMarkerIndex)
+                    if (readingSegment?.marker != '[') return null
+                    readingMarkerIndex++
+                    add(RubyToken(sentenceSegment.text, isTarget = true))
+                }
+                '{' -> {
+                    val readingSegment = readingMarkedSegments.getOrNull(readingMarkerIndex)
+                    if (readingSegment?.marker != '{') return null
+                    readingMarkerIndex++
+                    add(RubyToken(sentenceSegment.text, ruby = readingSegment.text))
+                }
+                else -> add(RubyToken(sentenceSegment.text))
+            }
+        }
+        if (readingMarkerIndex != readingMarkedSegments.size) return null
+    }
+}
+
+private fun String.hasRubyMarkers(): Boolean =
+    any { it == '[' || it == '{' }
+
+private fun String.toMarkedSegments(): List<MarkedSegment>? {
+    val segments = mutableListOf<MarkedSegment>()
+    val plain = StringBuilder()
+    var index = 0
+
+    fun flushPlain() {
+        if (plain.isNotEmpty()) {
+            segments.add(MarkedSegment(plain.toString()))
+            plain.clear()
+        }
+    }
+
+    while (index < length) {
+        val char = this[index]
+        val closeMarker = when (char) {
+            '[' -> ']'
+            '{' -> '}'
+            ']', '}' -> return null
+            else -> null
+        }
+
+        if (closeMarker == null) {
+            plain.append(char)
+            index++
+            continue
+        }
+
+        flushPlain()
+        val closeIndex = indexOf(closeMarker, startIndex = index + 1)
+        if (closeIndex < 0) return null
+        segments.add(
+            MarkedSegment(
+                text = substring(index + 1, closeIndex),
+                marker = char,
+            ),
+        )
+        index = closeIndex + 1
+    }
+    flushPlain()
+    return segments
+}
+
+private fun MutableList<RubyToken>.addTargetRunTokens(
+    runText: String,
+    runReading: String,
+    targetOffset: Int,
+    targetText: String,
+    targetReading: String,
+) {
+    val prefixText = runText.take(targetOffset)
+    val suffixText = runText.drop(targetOffset + targetText.length)
+    val targetReadingStart = runReading.indexOf(targetReading)
+
+    if (targetReadingStart < 0) {
+        if (prefixText.isNotEmpty()) add(RubyToken(prefixText, runReading))
+        add(RubyToken(targetText, isTarget = true))
+        if (suffixText.isNotEmpty()) add(RubyToken(suffixText))
+        return
+    }
+
+    val targetReadingEnd = targetReadingStart + targetReading.length
+    val prefixReading = runReading.take(targetReadingStart)
+    val suffixReading = runReading.drop(targetReadingEnd)
+
+    if (prefixText.isNotEmpty()) {
+        add(RubyToken(prefixText, prefixReading))
+    }
+    add(RubyToken(targetText, isTarget = true))
+    if (suffixText.isNotEmpty()) {
+        add(RubyToken(suffixText, suffixReading))
+    }
+}
+
+private fun targetOnlyTokens(sentence: String, targetText: String): List<RubyToken> {
+    val targetStart = sentence.indexOf(targetText)
+    if (targetStart < 0 || targetText.isEmpty()) {
+        return listOf(RubyToken(sentence))
+    }
+    return buildList {
+        if (targetStart > 0) add(RubyToken(sentence.substring(0, targetStart)))
+        add(RubyToken(sentence.substring(targetStart, targetStart + targetText.length), isTarget = true))
+        if (targetStart + targetText.length < sentence.length) {
+            add(RubyToken(sentence.substring(targetStart + targetText.length)))
+        }
+    }
+}
+
+private fun List<RubyToken>.mergePlainNeighbors(): List<RubyToken> {
+    val merged = mutableListOf<RubyToken>()
+    forEach { token ->
+        val last = merged.lastOrNull()
+        if (
+            last != null &&
+            last.ruby.isEmpty() &&
+            !last.isTarget &&
+            token.ruby.isEmpty() &&
+            !token.isTarget
+        ) {
+            merged[merged.lastIndex] = last.copy(text = last.text + token.text)
+        } else {
+            merged.add(token)
+        }
+    }
+    return merged
+}
+
+private fun Char.isKanji(): Boolean = this in '\u4E00'..'\u9FFF'
+
+private fun String.indexOfReadingAnchor(anchor: Char, startIndex: Int): Int {
+    for (index in startIndex until length) {
+        if (this[index].matchesReadingAnchor(anchor)) return index
+    }
+    return -1
+}
+
+private fun Char.matchesReadingAnchor(anchor: Char): Boolean =
+    this == anchor || this.toHiragana() == anchor.toHiragana()
+
+private fun Char.toHiragana(): Char =
+    if (this in '\u30A1'..'\u30F6') {
+        this - 0x60
+    } else {
+        this
+    }
 
 @Composable
 private fun highlightedSentence(
