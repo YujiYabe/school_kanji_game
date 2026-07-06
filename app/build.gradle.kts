@@ -40,6 +40,15 @@ android {
     }
 }
 
+val syncKanjiCsvToAssets by tasks.registering(Copy::class) {
+    from(rootProject.file("kanji_yomi_questions.csv"))
+    into(layout.projectDirectory.dir("src/main/assets"))
+}
+
+tasks.named("preBuild") {
+    dependsOn(syncKanjiCsvToAssets)
+}
+
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)

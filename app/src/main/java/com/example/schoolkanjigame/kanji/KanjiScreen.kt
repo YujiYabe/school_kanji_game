@@ -1,6 +1,8 @@
 package com.example.schoolkanjigame.kanji
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -15,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -40,6 +43,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.SpanStyle
@@ -51,6 +58,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import kotlin.math.max
+import kotlin.math.min
+import kotlin.math.roundToInt
 
 @Composable
 fun KanjiScreen(
@@ -125,6 +135,7 @@ private fun StartSettingsScreen(
     modifier: Modifier = Modifier,
 ) {
     var selectedMode by remember { mutableStateOf(LearningMode.Reading) }
+    val scrollState = rememberScrollState()
 
     Box(
         modifier = modifier
@@ -138,8 +149,9 @@ private fun StartSettingsScreen(
                     ),
                 ),
             )
+            .verticalScroll(scrollState)
             .padding(18.dp),
-        contentAlignment = Alignment.Center,
+        contentAlignment = Alignment.TopCenter,
     ) {
         Surface(
             modifier = Modifier.fillMaxWidth(),
@@ -177,8 +189,9 @@ private fun StartSettingsScreen(
                     title = "questions",
                     valueText = "${uiState.questionCount}問",
                     value = uiState.questionCount,
-                    valueRange = 1..50,
-                    steps = 48,
+                    valueRange = 5..100,
+                    steps = 18,
+                    stepSize = 5,
                     onValueChanged = onQuestionCountChanged,
                 )
 
@@ -307,6 +320,7 @@ private fun SettingsSlider(
     value: Int,
     valueRange: IntRange,
     steps: Int,
+    stepSize: Int = 1,
     onValueChanged: (Int) -> Unit,
 ) {
     Column(
@@ -333,7 +347,10 @@ private fun SettingsSlider(
         }
         Slider(
             value = value.toFloat(),
-            onValueChange = { onValueChanged((it + 0.5f).toInt().coerceIn(valueRange)) },
+            onValueChange = {
+                val steppedValue = (it / stepSize).roundToInt() * stepSize
+                onValueChanged(steppedValue.coerceIn(valueRange))
+            },
             valueRange = valueRange.first.toFloat()..valueRange.last.toFloat(),
             steps = steps,
         )
@@ -551,7 +568,9 @@ private fun RetryResultScreen(
     onRetryWrongQuestions: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val wrongReviews = uiState.readingReviews.filterNot { it.isCorrect }
+    val wrongReviews = uiState.readingAllReviews
+        .ifEmpty { uiState.readingReviews }
+        .filterNot { it.isCorrect }
 
     Column(
         modifier = modifier
@@ -606,28 +625,44 @@ private fun KanjiReviewList(
         shape = RoundedCornerShape(8.dp),
         color = MaterialTheme.colorScheme.surfaceVariant,
     ) {
-        Column(
+        LazyColumn(
             modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(12.dp),
+                .fillMaxSize(),
+            contentPadding = PaddingValues(12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             if (uiState.mode == LearningMode.Reading) {
+                val allReviews = uiState.readingAllReviews.ifEmpty { uiState.readingReviews }
                 val reviews = if (uiState.resultPhase == ResultPhase.RetryNeeded) {
-                    uiState.readingReviews.filterNot { it.isCorrect }
+                    allReviews.filterNot { it.isCorrect }
                 } else {
-                    uiState.readingReviews
+                    allReviews
                 }
                 reviews.forEach { review ->
-                    ReadingReviewRow(
-                        review = review,
-                        showCorrectAnswer = showCorrectAnswer,
-                    )
+                    item(key = review.questionId) {
+                        ReadingReviewRow(
+                            review = review,
+                            showCorrectAnswer = showCorrectAnswer,
+                        )
+                    }
                 }
             } else {
-                uiState.questions.forEachIndexed { index, question ->
-                    WritingReviewRow(questionNumber = index + 1, question = question)
+                val reviews = uiState.writingReviews.ifEmpty {
+                    uiState.questions.mapIndexed { index, question ->
+                        KanjiWritingReview(
+                            questionId = question.id,
+                            questionNumber = index + 1,
+                            sentence = question.fullSentence,
+                            writtenAnswer = "",
+                            correctAnswer = question.writingAnswer,
+                            writtenStrokeGroups = emptyList(),
+                        )
+                    }
+                }
+                reviews.forEach { review ->
+                    item(key = review.questionId) {
+                        WritingReviewRow(review = review)
+                    }
                 }
             }
         }
@@ -685,8 +720,7 @@ private fun ReadingReviewRow(
 
 @Composable
 private fun WritingReviewRow(
-    questionNumber: Int,
-    question: KanjiQuestion,
+    review: KanjiWritingReview,
 ) {
     Column(
         modifier = Modifier
@@ -701,13 +735,13 @@ private fun WritingReviewRow(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text(
-                text = "${questionNumber}問目",
+                text = "${review.questionNumber}問目",
                 color = Color(0xFF666666),
                 fontWeight = FontWeight.Bold,
                 fontSize = 13.sp,
             )
             Text(
-                text = question.fullSentence,
+                text = review.sentence,
                 color = Color.Black,
                 fontWeight = FontWeight.Black,
                 fontSize = 18.sp,
@@ -715,12 +749,95 @@ private fun WritingReviewRow(
             )
         }
         Text(
-            text = "答え: ${question.writingAnswer}",
+            text = "書いた文字: ${review.writtenAnswer.ifBlank { "未記録" }}   正解: ${review.correctAnswer}",
             color = Color.Black,
             fontWeight = FontWeight.Bold,
             fontSize = 15.sp,
             lineHeight = 20.sp,
         )
+        if (review.writtenStrokeGroups.isNotEmpty()) {
+            WrittenAnswerPreview(
+                strokeGroups = review.writtenStrokeGroups,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    }
+}
+
+@Composable
+private fun WrittenAnswerPreview(
+    strokeGroups: List<List<DrawnStroke>>,
+    modifier: Modifier = Modifier,
+) {
+    Canvas(
+        modifier = modifier
+            .height(92.dp)
+            .background(Color(0xFFF9FAFB), RoundedCornerShape(8.dp))
+            .border(1.dp, Color(0xFFE5E7EB), RoundedCornerShape(8.dp))
+            .padding(8.dp),
+    ) {
+        if (strokeGroups.isEmpty()) return@Canvas
+
+        val cellWidth = size.width / strokeGroups.size.coerceAtLeast(1)
+        strokeGroups.forEachIndexed { index, strokes ->
+            val points = strokes.flatMap { it.points }
+            if (points.isEmpty()) return@forEachIndexed
+
+            val minX = points.minOf { it.x }
+            val maxX = points.maxOf { it.x }
+            val minY = points.minOf { it.y }
+            val maxY = points.maxOf { it.y }
+            val contentWidth = max(1f, maxX - minX)
+            val contentHeight = max(1f, maxY - minY)
+            val cellLeft = index * cellWidth
+            val padding = 8f
+            val drawableWidth = max(1f, cellWidth - padding * 2f)
+            val drawableHeight = max(1f, size.height - padding * 2f)
+            val scale = min(drawableWidth / contentWidth, drawableHeight / contentHeight)
+            val offsetX = cellLeft + (cellWidth - contentWidth * scale) / 2f - minX * scale
+            val offsetY = (size.height - contentHeight * scale) / 2f - minY * scale
+
+            fun transformedPath(stroke: DrawnStroke): Path? {
+                val strokePoints = stroke.points
+                if (strokePoints.isEmpty()) return null
+                return Path().apply {
+                    moveTo(
+                        strokePoints.first().x * scale + offsetX,
+                        strokePoints.first().y * scale + offsetY,
+                    )
+                    strokePoints.drop(1).forEach { point ->
+                        lineTo(point.x * scale + offsetX, point.y * scale + offsetY)
+                    }
+                }
+            }
+
+            strokes.forEach { stroke ->
+                val strokePoints = stroke.points
+                if (strokePoints.size == 1) {
+                    val point = strokePoints.first()
+                    drawCircle(
+                        color = Color(0xFF111827),
+                        radius = 4f,
+                        center = androidx.compose.ui.geometry.Offset(
+                            point.x * scale + offsetX,
+                            point.y * scale + offsetY,
+                        ),
+                    )
+                } else {
+                    transformedPath(stroke)?.let { path ->
+                        drawPath(
+                            path = path,
+                            color = Color(0xFF111827),
+                            style = Stroke(
+                                width = 5f,
+                                cap = StrokeCap.Round,
+                                join = StrokeJoin.Round,
+                            ),
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 
