@@ -1,0 +1,12 @@
+# unknown_kanji.txt
+# 自動抽出で指定PDF内の読み問題として確認できなかった学年配当漢字
+# PDF: /home/yuji/Downloads/nao231228-kanji-yomi-01-matome2025ans.pdf
+
+1年: なし
+2年: なし
+3年: なし
+4年: 徳景梨隊
+5年: なし
+6年: 俳券
+
+合計: 6字
