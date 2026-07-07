@@ -182,10 +182,11 @@ private fun StartSettingsScreen(
 
                 SettingsSlider(
                     title = "timer",
-                    valueText = "${uiState.readingSecondsPerQuestion}秒",
+                    valueText = uiState.readingSecondsPerQuestion.formatTimerText(),
                     value = uiState.readingSecondsPerQuestion,
-                    valueRange = 1..30,
-                    steps = 28,
+                    valueRange = 10..180,
+                    steps = 16,
+                    stepSize = 10,
                     onValueChanged = onTimerChanged,
                 )
 
@@ -361,6 +362,16 @@ private fun SettingsSlider(
     }
 }
 
+private fun Int.formatTimerText(): String {
+    val minutes = this / 60
+    val seconds = this % 60
+    return when {
+        minutes == 0 -> "${seconds}秒"
+        seconds == 0 -> "${minutes}分"
+        else -> "${minutes}分${seconds}秒"
+    }
+}
+
 @Composable
 private fun ReadingQuizScreen(
     uiState: KanjiUiState,
@@ -397,6 +408,10 @@ private fun ReadingQuizScreen(
             targetReading = question.readingAnswers.firstOrNull().orEmpty(),
             modifier = Modifier.fillMaxWidth(),
         )
+        TranslationSentences(
+            englishSentence = question.englishSentence,
+            spanishSentence = question.spanishSentence,
+        )
         Spacer(modifier = Modifier.weight(1f))
         LazyVerticalGrid(
             columns = GridCells.Fixed(2),
@@ -428,6 +443,10 @@ private fun WritingQuizScreen(
     val question = uiState.currentQuestion ?: return
     val writingTargetReading = question.readingAnswers.firstOrNull().orEmpty()
     val writingPrompt = question.fullSentence.replaceFirst(question.targetText, writingTargetReading)
+    val writingMarkedPrompt = question.markedSentence.replaceFirst(
+        "[${question.targetText}]",
+        "[$writingTargetReading]",
+    )
     val density = LocalDensity.current
 
     Column(
@@ -443,9 +462,15 @@ private fun WritingQuizScreen(
         RubySentence(
             sentence = writingPrompt,
             sentenceReading = question.sentenceReading,
+            markedSentence = writingMarkedPrompt,
+            markedSentenceReading = question.markedSentenceReading,
             targetText = writingTargetReading,
             targetReading = writingTargetReading,
             modifier = Modifier.fillMaxWidth(),
+        )
+        TranslationSentences(
+            englishSentence = question.englishSentence,
+            spanishSentence = question.spanishSentence,
         )
         Text(
             text = "${uiState.currentWritingCharIndex + 1}文字目 / ${question.writingAnswer.length}文字中",
@@ -498,6 +523,37 @@ private fun WritingQuizScreen(
                 text = state.message,
                 color = MaterialTheme.colorScheme.error,
                 style = MaterialTheme.typography.bodyLarge,
+            )
+        }
+    }
+}
+
+@Composable
+private fun TranslationSentences(
+    englishSentence: String,
+    spanishSentence: String,
+    modifier: Modifier = Modifier,
+) {
+    if (englishSentence.isBlank() && spanishSentence.isBlank()) return
+
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        if (englishSentence.isNotBlank()) {
+            Text(
+                text = "EN: $englishSentence",
+                style = MaterialTheme.typography.bodyLarge,
+                lineHeight = 24.sp,
+                color = MaterialTheme.colorScheme.secondary,
+            )
+        }
+        if (spanishSentence.isNotBlank()) {
+            Text(
+                text = "ES: $spanishSentence",
+                style = MaterialTheme.typography.bodyLarge,
+                lineHeight = 24.sp,
+                color = MaterialTheme.colorScheme.secondary,
             )
         }
     }
@@ -665,6 +721,8 @@ private fun KanjiReviewList(
                             questionId = question.id,
                             questionNumber = index + 1,
                             sentence = question.fullSentence,
+                            englishSentence = question.englishSentence,
+                            spanishSentence = question.spanishSentence,
                             writtenAnswer = "",
                             correctAnswer = question.writingAnswer,
                             writtenStrokeGroups = emptyList(),
@@ -720,6 +778,10 @@ private fun ReadingReviewRow(
                 lineHeight = 24.sp,
             )
         }
+        ReviewTranslationSentences(
+            englishSentence = review.englishSentence,
+            spanishSentence = review.spanishSentence,
+        )
         Text(
             text = answerText,
             color = textColor,
@@ -760,6 +822,10 @@ private fun WritingReviewRow(
                 lineHeight = 24.sp,
             )
         }
+        ReviewTranslationSentences(
+            englishSentence = review.englishSentence,
+            spanishSentence = review.spanishSentence,
+        )
         Text(
             text = "書いた文字: ${review.writtenAnswer.ifBlank { "未記録" }}   正解: ${review.correctAnswer}",
             color = Color.Black,
@@ -771,6 +837,33 @@ private fun WritingReviewRow(
             WrittenAnswerPreview(
                 strokeGroups = review.writtenStrokeGroups,
                 modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    }
+}
+
+@Composable
+private fun ReviewTranslationSentences(
+    englishSentence: String,
+    spanishSentence: String,
+) {
+    if (englishSentence.isBlank() && spanishSentence.isBlank()) return
+
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        if (englishSentence.isNotBlank()) {
+            Text(
+                text = "EN: $englishSentence",
+                color = Color(0xFF4B5563),
+                fontSize = 14.sp,
+                lineHeight = 19.sp,
+            )
+        }
+        if (spanishSentence.isNotBlank()) {
+            Text(
+                text = "ES: $spanishSentence",
+                color = Color(0xFF4B5563),
+                fontSize = 14.sp,
+                lineHeight = 19.sp,
             )
         }
     }

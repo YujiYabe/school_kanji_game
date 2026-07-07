@@ -35,6 +35,8 @@ data class KanjiQuestion(
     val sentenceReading: String = "",
     val markedSentence: String = "",
     val markedSentenceReading: String = "",
+    val englishSentence: String = "",
+    val spanishSentence: String = "",
     val targetText: String,
     val readingAnswers: List<String>,
     val writingAnswer: String,
@@ -54,6 +56,8 @@ data class KanjiAnswerReview(
     val questionId: String,
     val questionNumber: Int,
     val sentence: String,
+    val englishSentence: String,
+    val spanishSentence: String,
     val selectedAnswer: String?,
     val correctAnswer: String,
     val isCorrect: Boolean,
@@ -63,6 +67,8 @@ data class KanjiWritingReview(
     val questionId: String,
     val questionNumber: Int,
     val sentence: String,
+    val englishSentence: String,
+    val spanishSentence: String,
     val writtenAnswer: String,
     val correctAnswer: String,
     val writtenStrokeGroups: List<List<DrawnStroke>>,
@@ -267,7 +273,7 @@ class KanjiViewModel(
     }
 
     fun setReadingSecondsPerQuestion(seconds: Int) {
-        val safeSeconds = seconds.coerceIn(1, 30)
+        val safeSeconds = seconds.toReadingTimerSeconds()
         settingsStore.saveReadingSecondsPerQuestion(safeSeconds)
         _uiState.update {
             it.copy(
@@ -295,7 +301,7 @@ class KanjiViewModel(
     }
 
     fun startReadingMode(secondsPerQuestion: Int) {
-        val safeSeconds = secondsPerQuestion.coerceAtLeast(1)
+        val safeSeconds = secondsPerQuestion.toReadingTimerSeconds()
         val selectedQuestions = buildQuestionsForGrade(
             grade = uiState.value.selectedGrade,
             count = uiState.value.questionCount,
@@ -528,6 +534,8 @@ class KanjiViewModel(
             questionId = question.id,
             questionNumber = previousReview?.questionNumber ?: state.currentQuestionIndex + 1,
             sentence = question.fullSentence,
+            englishSentence = question.englishSentence,
+            spanishSentence = question.spanishSentence,
             selectedAnswer = selectedAnswer,
             correctAnswer = correctAnswer,
             isCorrect = wasCorrect,
@@ -612,6 +620,8 @@ class KanjiViewModel(
                 questionId = question.id,
                 questionNumber = state.currentQuestionIndex + 1,
                 sentence = question.fullSentence,
+                englishSentence = question.englishSentence,
+                spanishSentence = question.spanishSentence,
                 writtenAnswer = updatedWritingAnswer,
                 correctAnswer = question.writingAnswer,
                 writtenStrokeGroups = updatedWritingStrokeGroups,
@@ -734,7 +744,7 @@ class SharedPreferencesKanjiSettingsStore(
             questionCount = sharedPreferences.getInt(KEY_QUESTION_COUNT, 10).coerceIn(5, 100),
             readingSecondsPerQuestion = sharedPreferences
                 .getInt(KEY_READING_SECONDS_PER_QUESTION, 10)
-                .coerceIn(1, 30),
+                .toReadingTimerSeconds(),
         )
 
     override fun saveSelectedGrade(selectedGrade: Int) {
@@ -751,7 +761,7 @@ class SharedPreferencesKanjiSettingsStore(
 
     override fun saveReadingSecondsPerQuestion(readingSecondsPerQuestion: Int) {
         sharedPreferences.edit()
-            .putInt(KEY_READING_SECONDS_PER_QUESTION, readingSecondsPerQuestion.coerceIn(1, 30))
+            .putInt(KEY_READING_SECONDS_PER_QUESTION, readingSecondsPerQuestion.toReadingTimerSeconds())
             .apply()
     }
 
@@ -777,9 +787,14 @@ private class InMemoryKanjiSettingsStore : KanjiSettingsStore {
 
     override fun saveReadingSecondsPerQuestion(readingSecondsPerQuestion: Int) {
         settings = settings.copy(
-            readingSecondsPerQuestion = readingSecondsPerQuestion.coerceIn(1, 30),
+            readingSecondsPerQuestion = readingSecondsPerQuestion.toReadingTimerSeconds(),
         )
     }
+}
+
+private fun Int.toReadingTimerSeconds(): Int {
+    val rounded = ((this + 5) / 10) * 10
+    return rounded.coerceIn(10, 180)
 }
 
 interface QuestionAttemptStore {

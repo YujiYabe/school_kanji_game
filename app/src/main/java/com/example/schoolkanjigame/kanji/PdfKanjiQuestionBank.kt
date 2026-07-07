@@ -10,6 +10,8 @@ private data class CsvKanjiSeed(
     val markedSentence: String,
     val sentenceReading: String,
     val markedSentenceReading: String,
+    val englishSentence: String,
+    val spanishSentence: String,
 )
 
 fun loadKanjiQuestionsFromCsv(
@@ -37,6 +39,8 @@ fun loadKanjiQuestionsFromCsv(
             sentenceReading = seed.sentenceReading,
             markedSentence = seed.markedSentence,
             markedSentenceReading = seed.markedSentenceReading,
+            englishSentence = seed.englishSentence,
+            spanishSentence = seed.spanishSentence,
             targetText = seed.target,
             readingAnswers = listOf(seed.reading) + distractors,
             writingAnswer = seed.target,
@@ -55,6 +59,8 @@ private fun parseCsvKanjiSeed(line: String): CsvKanjiSeed? {
     val reading = columns[2]
     val markedSentence = columns[3]
     val markedSentenceReading = columns.getOrNull(4).orEmpty()
+    val englishSentence = columns.getOrNull(5).orEmpty()
+    val spanishSentence = columns.getOrNull(6).orEmpty()
     val sentence = markedSentence.stripRubyMarkers()
     val sentenceReading = markedSentenceReading.stripRubyMarkers()
 
@@ -66,6 +72,8 @@ private fun parseCsvKanjiSeed(line: String): CsvKanjiSeed? {
         markedSentence = markedSentence,
         sentenceReading = sentenceReading,
         markedSentenceReading = markedSentenceReading,
+        englishSentence = englishSentence,
+        spanishSentence = spanishSentence,
     )
 }
 
