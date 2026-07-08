@@ -315,7 +315,7 @@
 2,市,いち,{朝}[市]で{新}せんな{野菜}や{魚}を{買}う。,{あさ}[いち]で{しん}せんな{やさい}や{さかな}を{か}う。,Buy fresh vegetables and fish at the morning market.,Compre verduras y pescado frescos en el mercado matutino.
 2,市,し,[市]{役所}から{大事}な{手紙}が{届}いた。,[し]{やくしょ}から{だいじ}な{てがみ}が{とど}いた。,An important letter arrived from city hall.,Llegó una carta importante del ayuntamiento.
 2,帰,かえ,[帰]り{道}でかわいい{子}ねこと{会}った。,[かえ]り{みち}でかわいい{こ}ねこと{あ}った。,I met a cute kitten on the way home.,Me encontré con un lindo gatito de camino a casa.
-2,帰,き,{入院}していた{選手}が{昨日復}[帰]した。,{にゅういん}していた{せんしゅ}が{}[き]した。,The player who was hospitalized returned yesterday.,El jugador que estuvo hospitalizado regresó ayer.
+2,帰,き,{入院}していた{選手}が{昨日復}[帰]した。,{にゅういん}していた{せんしゅ}が{きのうふっ}[き]した。,The player who was hospitalized returned yesterday.,El jugador que estuvo hospitalizado regresó ayer.
 2,広,こう,[広]{告}のチラシを{受}け{取}る。,[こう]{こく}のチラシを{う}け{と}る。,Receive advertising flyers.,Recibir folletos publicitarios.
 2,広,ひろ,{野原}にシートを[広]げてピクニックする。,{のはら}にシートを[ひろ]げてピクニックする。,Spread out a sheet in the field and have a picnic.,Extiende una sábana en el campo y haz un picnic.
 2,店,てん,{駅}の{売}[店]でお{弁当}を{買}う。,{えき}の{ばい}[てん]でお{べんとう}を{か}う。,Buy a bento box at the station store.,Compra una caja bento en la tienda de la estación.
@@ -487,7 +487,7 @@
 2,話,はなし,{先生}の[話]の{後}に{質問}をする。,{せんせい}の[はなし]の{あと}に{しつもん}をする。,Ask questions after the teacher speaks.,Haga preguntas después de que el maestro hable.
 2,話,ばなし,{長}[話]に{付}き{合}わされてうんざりする。,{なが}[ばなし]に{つ}き{あ}わされてうんざりする。,I get tired of having to deal with long conversations.,Me canso de tener que lidiar con largas conversaciones.
 2,話,わ,かんちがいで{会}[話]がかみ{合}わなくなる。,かんちがいで{かい}[わ]がかみ{あ}わなくなる。,Conversations become incoherent due to differences.,Las conversaciones se vuelven incoherentes debido a las diferencias.
-2,語,かた,{幼}ち{園}の{思}い{出}を[語]る。,{おさな}ち{えん}の{おも}い{で}を[かた]る。,Talk about your childhood memories.,Habla sobre tus recuerdos de la infancia.
+2,語,かた,{幼}ち{園}の{思}い{出}を[語]る。,{よう}ち{えん}の{おも}い{で}を[かた]る。,Talk about your childhood memories.,Habla sobre tus recuerdos de la infancia.
 2,語,ご,{国}[語]{辞典}でわからない{言葉}を{調}べる。,{こく}[ご]{じてん}でわからない{ことば}を{しら}べる。,Look up words you don't understand in a Japanese dictionary.,Busque palabras que no comprenda en un diccionario japonés.
 2,読,とう,ここに[読]{点}を{入}れた{方}が{読}みやすいよ。,ここに[とう]{てん}を{い}れた{ほう}が{よ}みやすいよ。,It would be easier to read if you put a comma here.,Sería más fácil de leer si pones una coma aquí.
 2,読,とく,{昔}の{教科書}である、[読]{本}が{図書館}で{保管}される。,{むかし}の{きょうかしょ}である、[とく]{ほん}が{としょかん}で{ほかん}される。,"Readers, which are old textbooks, are kept in the library.","Los lectores, que son libros de texto antiguos, se guardan en la biblioteca."
@@ -669,7 +669,7 @@
 3,平,びょう,[平]{等}になるよう、ケーキを{切}り{分}ける。,[びょう]{どう}になるよう、ケーキを{き}り{わ}ける。,Cut the cake into equal pieces.,Cortar el bizcocho en trozos iguales.
 3,平,へい,{広島}[平]{和記念公園}をおとずれる。,{ひろしま}[へい]{わきねんこうえん}をおとずれる。,Visit Hiroshima Peace Memorial Park.,Visita el Parque Conmemorativo de la Paz de Hiroshima.
 3,幸,こう,{最近}は[幸]{運}な{出来事}が{多}かった。,{さいきん}は[こう]{うん}な{できごと}が{おお}かった。,There have been many fortunate events recently.,Ha habido muchos acontecimientos afortunados recientemente.
-3,幸,しあわ,[幸]せの{四葉}のクローバーを{探}す。,[しあわ]せの{よんよう}のクローバーを{さが}す。,Search for the four-leaf clover of happiness.,Busca el trébol de cuatro hojas de la felicidad.
+3,幸,しあわ,[幸]せの{四葉}のクローバーを{探}す。,[しあわ]せの{よつば}のクローバーを{さが}す。,Search for the four-leaf clover of happiness.,Busca el trébol de cuatro hojas de la felicidad.
 3,度,ど,{夜}の{学校}で[度]{胸試}しをする。,{よる}の{がっこう}で[ど]{きょうため}しをする。,Test your courage at night school.,Pon a prueba tu coraje en la escuela nocturna.
 3,庫,こ,{買}ってきたプリンを{冷蔵}[庫]に{入}れる。,{か}ってきたプリンを{れいぞう}[こ]に{い}れる。,Put the pudding you bought in the refrigerator.,Pon el pudín que compraste en el frigorífico.
 3,庭,てい,{家}[庭]{訪問}に{先生}がやって{来}る。,{か}[てい]{ほうもん}に{せんせい}がやって{く}る。,A teacher comes to visit your home.,Un profesor viene a visitar tu casa.
@@ -1018,11 +1018,11 @@
 4,夫,ふ,{近所}に{子供}のいる[夫]{妻}が{引}っこしてくる。,{きんじょ}に{こども}のいる[ふ]{さい}が{ひ}っこしてくる。,A couple with children living in the neighborhood moves in.,Se muda una pareja con hijos que vive en el barrio.
 4,失,うしな,ネコを{追}いかけていたが{見}[失]った。,ネコを{お}いかけていたが{み}[うしな]った。,"I was chasing a cat, but lost it.","Estaba persiguiendo a un gato, pero lo perdí."
 4,失,しつ,お{客}さんに[失]{礼}なことを{言}っておこられた。,お{きゃく}さんに[しつ]{れい}なことを{い}っておこられた。,I got offended by saying something rude to a customer.,Me ofendí al decirle algo grosero a un cliente.
-4,奈,なら,[奈]{良}の{大仏}は{約十五}メートルの{大}きさがある。,[なら]{}の{だいぶつ}は{やくじゅうご}メートルの{おお}きさがある。,The Great Buddha in Nara is approximately 15 meters in size.,El Gran Buda de Nara mide aproximadamente 15 metros.
+4,奈,な,[奈]{良}の{大仏}は{約十五}メートルの{大}きさがある。,[な]{ら}の{だいぶつ}は{やくじゅうご}メートルの{おお}きさがある。,The Great Buddha in Nara is approximately 15 meters in size.,El Gran Buda de Nara mide aproximadamente 15 metros.
 4,好,こう,{今日}のごはんは{大}[好]{物}のハンバーグだ。,{きょう}のごはんは{だい}[こう]{ぶつ}のハンバーグだ。,Today's meal is my favorite hamburger steak.,La comida de hoy es mi hamburguesa favorita.
 4,好,この,{宮田}さんはホラー{小説}が[好]みだ。,{みやた}さんはホラー{しょうせつ}が[この]みだ。,Mr. Miyata likes horror novels.,Al señor Miyata le gustan las novelas de terror.
 4,好,す,{姉}はモンブランが{大}[好]きだ。,{あね}はモンブランが{だい}[す]きだ。,My sister loves Mont Blanc.,A mi hermana le encanta el Mont Blanc.
-4,媛,えひめ,スーパーで{愛}[媛]{県}のミカンが{売}られていた。,スーパーで{}[えひめ]{けん}のミカンが{う}られていた。,Mandarin oranges from Ehime Prefecture were on sale at the supermarket.,En el supermercado se vendían mandarinas de la prefectura de Ehime.
+4,媛,ひめ,スーパーで{愛}[媛]{県}のミカンが{売}られていた。,スーパーで{え}[ひめ]{けん}のミカンが{う}られていた。,Mandarin oranges from Ehime Prefecture were on sale at the supermarket.,En el supermercado se vendían mandarinas de la prefectura de Ehime.
 4,季,き,[季]{節}の{変}わり{目}にかぜを{引}いてしまう。,[き]{せつ}の{か}わり{め}にかぜを{ひ}いてしまう。,I catch a cold when the seasons change.,Me resfrío cuando cambian las estaciones.
 4,孫,そん,タイムマシンで{自分}の{子}[孫]に{会}いに{行}く。,タイムマシンで{じぶん}の{し}[そん]に{あ}いに{い}く。,Use a time machine to visit your descendants.,Utiliza una máquina del tiempo para visitar a tus descendientes.
 4,孫,まご,おじいちゃんが[孫]をあまやかす。,おじいちゃんが[まご]をあまやかす。,Grandpa tricks his grandson.,El abuelo engaña a su nieto.
@@ -1227,8 +1227,8 @@
 4,関,かか,{前}に[関]わったことのある{人}から{手紙}が{届}いた。,{まえ}に[かか]わったことのある{ひと}から{てがみ}が{とど}いた。,I received a letter from someone I had worked with before.,Recibí una carta de alguien con quien había trabajado antes.
 4,関,かん,いきなり[関]{係}ない{話}を{始}める。,いきなり[かん]{けい}ない{はなし}を{はじ}める。,Suddenly start talking about something unrelated.,De repente empieza a hablar de algo que no tiene relación.
 4,関,せき,{巻}き{物}をぬすんだにん{者}が[関]{所}でつかまった。,{ま}き{もの}をぬすんだにん{じゃ}が[せき]{しょ}でつかまった。,The ninja who stole the scroll was caught at the checkpoint.,El ninja que robó el pergamino fue atrapado en el puesto de control.
-4,阜,ぎふ,{岐}[阜]{城}は{信長}が{住}んでいた{城}として{有名}だ。,{}[ぎふ]{じょう}は{のぶな}が{がす}んでいた{しろ}として{ゆうめい}だ。,Gifu Castle is famous as the castle where Nobunaga lived.,El castillo de Gifu es famoso por ser el castillo donde vivió Nobunaga.
-4,阪,おおさか,{大}[阪]は「{食}いだおれの{街}」と{言}われている。,{}[おおさか]は「{く}いだおれの{まち}」と{い}われている。,Osaka is said to be ``the city of foodies.'',"Se dice que Osaka es ""la ciudad de los amantes de la comida""."
+4,阜,ふ,{岐}[阜]{城}は{信長}が{住}んでいた{城}として{有名}だ。,{ぎ}[ふ]{じょう}は{のぶなが}が{す}んでいた{しろ}として{ゆうめい}だ。,Gifu Castle is famous as the castle where Nobunaga lived.,El castillo de Gifu es famoso por ser el castillo donde vivió Nobunaga.
+4,阪,さか,{大}[阪]は「{食}いだおれの{街}」と{言}われている。,{おお}[さか]は「{く}いだおれの{まち}」と{い}われている。,Osaka is said to be ``the city of foodies.'',"Se dice que Osaka es ""la ciudad de los amantes de la comida""."
 4,陸,りく,{魚}が[陸]に{打}ち{上}げられる。,{さかな}が[りく]に{う}ち{あ}げられる。,Fish are washed ashore.,Los peces son arrastrados a la orilla.
 4,静,しず,ねている{赤}ちゃんを[静]かに{運}ぶ。,ねている{あか}ちゃんを[しず]かに{はこ}ぶ。,Gently carry a sleeping baby.,Lleve con cuidado a un bebé dormido.
 4,静,せい,{冬}はよく[静]{電気}が{起}こるからきらいだ。,{ふゆ}はよく[せい]{でんき}が{お}こるからきらいだ。,I don't like it in the winter because I often get static electricity.,No me gusta el invierno porque a menudo tengo electricidad estática.
