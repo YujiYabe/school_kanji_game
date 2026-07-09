@@ -27,6 +27,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
+import org.json.JSONArray
+import org.json.JSONObject
 
 data class KanjiQuestion(
     val id: String,
@@ -56,6 +58,11 @@ data class KanjiAnswerReview(
     val questionId: String,
     val questionNumber: Int,
     val sentence: String,
+    val sentenceReading: String = "",
+    val markedSentence: String = "",
+    val markedSentenceReading: String = "",
+    val targetText: String = "",
+    val targetReading: String = "",
     val englishSentence: String,
     val spanishSentence: String,
     val selectedAnswer: String?,
@@ -67,11 +74,26 @@ data class KanjiWritingReview(
     val questionId: String,
     val questionNumber: Int,
     val sentence: String,
+    val sentenceReading: String = "",
+    val markedSentence: String = "",
+    val markedSentenceReading: String = "",
+    val targetText: String = "",
+    val targetReading: String = "",
     val englishSentence: String,
     val spanishSentence: String,
     val writtenAnswer: String,
     val correctAnswer: String,
     val writtenStrokeGroups: List<List<DrawnStroke>>,
+)
+
+data class KanjiHistoryEntry(
+    val id: String,
+    val completedAtMillis: Long,
+    val grade: Int,
+    val questionCount: Int,
+    val readingSecondsPerQuestion: Int,
+    val readingReviews: List<KanjiAnswerReview>,
+    val writingReviews: List<KanjiWritingReview>,
 )
 
 enum class ResultPhase {
@@ -104,6 +126,7 @@ data class KanjiUiState(
     val selectedGrade: Int = 1,
     val questionCount: Int = 10,
     val questions: List<KanjiQuestion> = emptyList(),
+    val writingQuestions: List<KanjiQuestion> = emptyList(),
     val currentQuestionIndex: Int = 0,
     val shuffledReadingAnswers: List<String> = emptyList(),
     val readingSecondsPerQuestion: Int = 10,
@@ -122,6 +145,9 @@ data class KanjiUiState(
     val recognitionState: RecognitionState = RecognitionState.Idle,
     val inkModelState: InkModelState = InkModelState.Idle,
     val isFinished: Boolean = false,
+    val historyEntries: List<KanjiHistoryEntry> = emptyList(),
+    val isHistoryVisible: Boolean = false,
+    val selectedHistoryEntry: KanjiHistoryEntry? = null,
 ) {
     val currentQuestion: KanjiQuestion?
         get() = questions.getOrNull(currentQuestionIndex)
@@ -209,12 +235,14 @@ class KanjiViewModel(
     private val questionBank: List<KanjiQuestion>,
     private val questionAttemptStore: QuestionAttemptStore,
     private val settingsStore: KanjiSettingsStore,
+    private val historyStore: KanjiHistoryStore,
 ) : ViewModel() {
     constructor() : this(
         recognizerClient = JapaneseMlKitDigitalInkRecognizerClient(),
         questionBank = emptyList(),
         questionAttemptStore = InMemoryQuestionAttemptStore(),
         settingsStore = InMemoryKanjiSettingsStore(),
+        historyStore = InMemoryKanjiHistoryStore(),
     )
 
     companion object {
@@ -222,6 +250,7 @@ class KanjiViewModel(
             questionBank: List<KanjiQuestion>,
             questionAttemptStore: QuestionAttemptStore,
             settingsStore: KanjiSettingsStore,
+            historyStore: KanjiHistoryStore,
         ): ViewModelProvider.Factory =
             object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
@@ -231,6 +260,7 @@ class KanjiViewModel(
                         questionBank = questionBank,
                         questionAttemptStore = questionAttemptStore,
                         settingsStore = settingsStore,
+                        historyStore = historyStore,
                     ) as T
             }
     }
@@ -252,6 +282,7 @@ class KanjiViewModel(
                 ?.readingAnswers
                 .orEmpty()
                 .shuffled(),
+            historyEntries = historyStore.loadHistory(),
         ),
     )
     val uiState: StateFlow<KanjiUiState> = _uiState.asStateFlow()
@@ -314,6 +345,7 @@ class KanjiViewModel(
                 mode = LearningMode.Reading,
                 isSessionStarted = true,
                 questions = selectedQuestions,
+                writingQuestions = selectedQuestions,
                 currentQuestionIndex = 0,
                 shuffledReadingAnswers = selectedQuestions.firstOrNull()?.readingAnswers.orEmpty().shuffled(),
                 readingSecondsPerQuestion = safeSeconds,
@@ -331,9 +363,49 @@ class KanjiViewModel(
                 strokes = emptyList(),
                 recognitionState = RecognitionState.Idle,
                 isFinished = selectedQuestions.isEmpty(),
+                isHistoryVisible = false,
+                selectedHistoryEntry = null,
             )
         }
         startReadingTimer()
+    }
+
+    fun showHistory() {
+        readingTimerJob?.cancel()
+        readingScreenActive = false
+        _uiState.update {
+            it.copy(
+                historyEntries = historyStore.loadHistory(),
+                isHistoryVisible = true,
+                selectedHistoryEntry = null,
+            )
+        }
+    }
+
+    fun hideHistory() {
+        _uiState.update {
+            it.copy(
+                isHistoryVisible = false,
+                selectedHistoryEntry = null,
+            )
+        }
+    }
+
+    fun showHistoryDetail(entryId: String) {
+        val entry = historyStore.loadHistory().firstOrNull { it.id == entryId }
+        _uiState.update {
+            it.copy(
+                historyEntries = historyStore.loadHistory(),
+                isHistoryVisible = true,
+                selectedHistoryEntry = entry,
+            )
+        }
+    }
+
+    fun hideHistoryDetail() {
+        _uiState.update {
+            it.copy(selectedHistoryEntry = null)
+        }
     }
 
     fun setReadingScreenActive(active: Boolean) {
@@ -362,8 +434,10 @@ class KanjiViewModel(
         val state = uiState.value
         if (state.mode != LearningMode.Reading || state.resultPhase != ResultPhase.RetryNeeded) return
 
-        val questionsById = state.questions.associateBy { it.id }
-        val retryQuestions = state.readingAllReviews
+        val questionsById = (state.writingQuestions + state.questions)
+            .distinctBy { it.id }
+            .associateBy { it.id }
+        val retryQuestions = state.readingReviews
             .filterNot { it.isCorrect }
             .mapNotNull { questionsById[it.questionId] }
 
@@ -408,6 +482,7 @@ class KanjiViewModel(
                 mode = LearningMode.Writing,
                 isSessionStarted = true,
                 questions = selectedQuestions,
+                writingQuestions = selectedQuestions,
                 currentQuestionIndex = 0,
                 currentWritingCharIndex = 0,
                 readingReviews = emptyList(),
@@ -534,6 +609,11 @@ class KanjiViewModel(
             questionId = question.id,
             questionNumber = previousReview?.questionNumber ?: state.currentQuestionIndex + 1,
             sentence = question.fullSentence,
+            sentenceReading = question.sentenceReading,
+            markedSentence = question.markedSentence,
+            markedSentenceReading = question.markedSentenceReading,
+            targetText = question.targetText,
+            targetReading = correctAnswer,
             englishSentence = question.englishSentence,
             spanishSentence = question.spanishSentence,
             selectedAnswer = selectedAnswer,
@@ -546,34 +626,84 @@ class KanjiViewModel(
         val updatedAllReviews = (state.readingAllReviews
             .filterNot { it.questionId == review.questionId } + review)
             .sortedBy { it.questionNumber }
-        val hasWrongAnswers = updatedAllReviews.any { !it.isCorrect }
-        _uiState.update {
-            it.copy(
-                currentQuestionIndex = nextIndex.coerceAtMost(it.questions.size),
-                shuffledReadingAnswers = if (finished) {
-                    emptyList()
-                } else {
-                    it.questions[nextIndex].readingAnswers.shuffled()
-                },
-                readingTimeRemaining = it.readingSecondsPerQuestion,
-                readingCorrectCount = it.readingCorrectCount + if (wasCorrect) 1 else 0,
-                readingReviews = updatedReviews,
-                readingAllReviews = updatedAllReviews,
-                resultPhase = if (finished && hasWrongAnswers) {
-                    ResultPhase.RetryNeeded
-                } else {
-                    ResultPhase.Final
-                },
-                isFinished = finished,
-            )
-        }
-
         if (finished) {
-            readingTimerJob?.cancel()
-            readingTimerJob = null
+            finishReadingRound(
+                wasCorrect = wasCorrect,
+                updatedReviews = updatedReviews,
+                updatedAllReviews = updatedAllReviews,
+            )
         } else {
+            _uiState.update {
+                it.copy(
+                    currentQuestionIndex = nextIndex,
+                    shuffledReadingAnswers = it.questions[nextIndex].readingAnswers.shuffled(),
+                    readingTimeRemaining = it.readingSecondsPerQuestion,
+                    readingCorrectCount = it.readingCorrectCount + if (wasCorrect) 1 else 0,
+                    readingReviews = updatedReviews,
+                    readingAllReviews = updatedAllReviews,
+                    resultPhase = ResultPhase.Final,
+                    isFinished = false,
+                )
+            }
             startReadingTimer()
         }
+    }
+
+    private fun finishReadingRound(
+        wasCorrect: Boolean,
+        updatedReviews: List<KanjiAnswerReview>,
+        updatedAllReviews: List<KanjiAnswerReview>,
+    ) {
+        val state = uiState.value
+        val allSessionQuestions = (state.writingQuestions + state.questions).distinctBy { it.id }
+        val questionsById = allSessionQuestions.associateBy { it.id }
+        val retryQuestions = updatedReviews
+            .filterNot { it.isCorrect }
+            .mapNotNull { questionsById[it.questionId] }
+
+        readingTimerJob?.cancel()
+        readingTimerJob = null
+
+        if (retryQuestions.isNotEmpty()) {
+            readingScreenActive = false
+            _uiState.update {
+                it.copy(
+                    currentQuestionIndex = it.questions.size,
+                    shuffledReadingAnswers = emptyList(),
+                    readingTimeRemaining = it.readingSecondsPerQuestion,
+                    readingCorrectCount = it.readingCorrectCount + if (wasCorrect) 1 else 0,
+                    readingReviews = updatedReviews,
+                    readingAllReviews = updatedAllReviews,
+                    resultPhase = ResultPhase.RetryNeeded,
+                    isFinished = true,
+                )
+            }
+            return
+        }
+
+        readingScreenActive = false
+        val writingQuestions = state.writingQuestions.ifEmpty { state.questions }
+        _uiState.update {
+            it.copy(
+                mode = LearningMode.Writing,
+                questions = writingQuestions,
+                currentQuestionIndex = 0,
+                shuffledReadingAnswers = emptyList(),
+                readingTimeRemaining = it.readingSecondsPerQuestion,
+                readingCorrectCount = it.readingOriginalQuestionCount,
+                readingReviews = updatedReviews,
+                readingAllReviews = updatedAllReviews,
+                resultPhase = ResultPhase.Final,
+                currentWritingCharIndex = 0,
+                currentWritingAnswer = "",
+                currentWritingStrokeGroups = emptyList(),
+                writingReviews = emptyList(),
+                strokes = emptyList(),
+                recognitionState = RecognitionState.Idle,
+                isFinished = writingQuestions.isEmpty(),
+            )
+        }
+        prepareInkModel()
     }
 
     private fun handleWritingRecognitionSuccess(recognizedCandidates: List<String>) {
@@ -620,12 +750,20 @@ class KanjiViewModel(
                 questionId = question.id,
                 questionNumber = state.currentQuestionIndex + 1,
                 sentence = question.fullSentence,
+                sentenceReading = question.sentenceReading,
+                markedSentence = question.markedSentence,
+                markedSentenceReading = question.markedSentenceReading,
+                targetText = question.targetText,
+                targetReading = question.readingAnswers.firstOrNull().orEmpty(),
                 englishSentence = question.englishSentence,
                 spanishSentence = question.spanishSentence,
                 writtenAnswer = updatedWritingAnswer,
                 correctAnswer = question.writingAnswer,
                 writtenStrokeGroups = updatedWritingStrokeGroups,
             )
+        }
+        if (finished) {
+            saveCompletedHistory(state, updatedWritingReviews)
         }
         _uiState.update {
             it.copy(
@@ -641,6 +779,7 @@ class KanjiViewModel(
                     RecognitionState.Idle
                 },
                 isFinished = finished,
+                historyEntries = if (finished) historyStore.loadHistory() else it.historyEntries,
             )
         }
     }
@@ -659,6 +798,7 @@ class KanjiViewModel(
                 isFinished = false,
                 currentQuestionIndex = 0,
                 questions = buildQuestionsForGrade(state.selectedGrade, state.questionCount),
+                writingQuestions = emptyList(),
                 shuffledReadingAnswers = questionsForGrade(state.selectedGrade)
                     .firstOrNull()
                     ?.readingAnswers
@@ -677,8 +817,29 @@ class KanjiViewModel(
                 writingReviews = emptyList(),
                 strokes = emptyList(),
                 recognitionState = RecognitionState.Idle,
+                isHistoryVisible = false,
+                selectedHistoryEntry = null,
             )
         }
+    }
+
+    private fun saveCompletedHistory(
+        state: KanjiUiState,
+        writingReviews: List<KanjiWritingReview>,
+    ) {
+        val completedAtMillis = System.currentTimeMillis()
+        historyStore.saveEntry(
+            KanjiHistoryEntry(
+                id = "history_$completedAtMillis",
+                completedAtMillis = completedAtMillis,
+                grade = state.selectedGrade,
+                questionCount = state.readingOriginalQuestionCount.takeIf { it > 0 }
+                    ?: state.questionCount,
+                readingSecondsPerQuestion = state.readingSecondsPerQuestion,
+                readingReviews = state.readingAllReviews.ifEmpty { state.readingReviews },
+                writingReviews = writingReviews.map { it.copy(writtenStrokeGroups = emptyList()) },
+            ),
+        )
     }
 
     private fun questionsForGrade(grade: Int): List<KanjiQuestion> =
@@ -735,6 +896,166 @@ interface KanjiSettingsStore {
     fun saveReadingSecondsPerQuestion(readingSecondsPerQuestion: Int)
 }
 
+interface KanjiHistoryStore {
+    fun loadHistory(): List<KanjiHistoryEntry>
+    fun saveEntry(entry: KanjiHistoryEntry)
+}
+
+class SharedPreferencesKanjiHistoryStore(
+    private val sharedPreferences: SharedPreferences,
+) : KanjiHistoryStore {
+    override fun loadHistory(): List<KanjiHistoryEntry> {
+        val rawHistory = sharedPreferences.getString(KEY_HISTORY_ENTRIES, null).orEmpty()
+        if (rawHistory.isBlank()) return emptyList()
+
+        return runCatching {
+            val jsonArray = JSONArray(rawHistory)
+            buildList {
+                for (index in 0 until jsonArray.length()) {
+                    val json = jsonArray.optJSONObject(index) ?: continue
+                    add(json.toHistoryEntry())
+                }
+            }.sortedByDescending { it.completedAtMillis }
+        }.getOrDefault(emptyList())
+    }
+
+    override fun saveEntry(entry: KanjiHistoryEntry) {
+        val updatedHistory = (listOf(entry) + loadHistory())
+            .distinctBy { it.id }
+            .sortedByDescending { it.completedAtMillis }
+            .take(MAX_HISTORY_COUNT)
+        val jsonArray = JSONArray()
+        updatedHistory.forEach { jsonArray.put(it.toJson()) }
+        sharedPreferences.edit()
+            .putString(KEY_HISTORY_ENTRIES, jsonArray.toString())
+            .apply()
+    }
+
+    private fun JSONObject.toHistoryEntry(): KanjiHistoryEntry =
+        KanjiHistoryEntry(
+            id = optString("id"),
+            completedAtMillis = optLong("completedAtMillis"),
+            grade = optInt("grade").coerceIn(1, 6),
+            questionCount = optInt("questionCount").coerceIn(1, 100),
+            readingSecondsPerQuestion = optInt("readingSecondsPerQuestion").toReadingTimerSeconds(),
+            readingReviews = optJSONArray("readingReviews").toReadingReviews(),
+            writingReviews = optJSONArray("writingReviews").toWritingReviews(),
+        )
+
+    private fun KanjiHistoryEntry.toJson(): JSONObject =
+        JSONObject()
+            .put("id", id)
+            .put("completedAtMillis", completedAtMillis)
+            .put("grade", grade)
+            .put("questionCount", questionCount)
+            .put("readingSecondsPerQuestion", readingSecondsPerQuestion)
+            .put("readingReviews", readingReviews.toReadingJsonArray())
+            .put("writingReviews", writingReviews.toWritingJsonArray())
+
+    private fun JSONArray?.toReadingReviews(): List<KanjiAnswerReview> {
+        if (this == null) return emptyList()
+        return buildList {
+            for (index in 0 until length()) {
+                val json = optJSONObject(index) ?: continue
+                add(
+                    KanjiAnswerReview(
+                        questionId = json.optString("questionId"),
+                        questionNumber = json.optInt("questionNumber"),
+                        sentence = json.optString("sentence"),
+                        sentenceReading = json.optString("sentenceReading"),
+                        markedSentence = json.optString("markedSentence"),
+                        markedSentenceReading = json.optString("markedSentenceReading"),
+                        targetText = json.optString("targetText"),
+                        targetReading = json.optString("targetReading"),
+                        englishSentence = json.optString("englishSentence"),
+                        spanishSentence = json.optString("spanishSentence"),
+                        selectedAnswer = json.optStringOrNull("selectedAnswer"),
+                        correctAnswer = json.optString("correctAnswer"),
+                        isCorrect = json.optBoolean("isCorrect"),
+                    ),
+                )
+            }
+        }
+    }
+
+    private fun List<KanjiAnswerReview>.toReadingJsonArray(): JSONArray =
+        JSONArray().also { jsonArray ->
+            forEach { review ->
+                jsonArray.put(
+                    JSONObject()
+                        .put("questionId", review.questionId)
+                        .put("questionNumber", review.questionNumber)
+                        .put("sentence", review.sentence)
+                        .put("sentenceReading", review.sentenceReading)
+                        .put("markedSentence", review.markedSentence)
+                        .put("markedSentenceReading", review.markedSentenceReading)
+                        .put("targetText", review.targetText)
+                        .put("targetReading", review.targetReading)
+                        .put("englishSentence", review.englishSentence)
+                        .put("spanishSentence", review.spanishSentence)
+                        .put("selectedAnswer", review.selectedAnswer)
+                        .put("correctAnswer", review.correctAnswer)
+                        .put("isCorrect", review.isCorrect),
+                )
+            }
+        }
+
+    private fun JSONArray?.toWritingReviews(): List<KanjiWritingReview> {
+        if (this == null) return emptyList()
+        return buildList {
+            for (index in 0 until length()) {
+                val json = optJSONObject(index) ?: continue
+                add(
+                    KanjiWritingReview(
+                        questionId = json.optString("questionId"),
+                        questionNumber = json.optInt("questionNumber"),
+                        sentence = json.optString("sentence"),
+                        sentenceReading = json.optString("sentenceReading"),
+                        markedSentence = json.optString("markedSentence"),
+                        markedSentenceReading = json.optString("markedSentenceReading"),
+                        targetText = json.optString("targetText"),
+                        targetReading = json.optString("targetReading"),
+                        englishSentence = json.optString("englishSentence"),
+                        spanishSentence = json.optString("spanishSentence"),
+                        writtenAnswer = json.optString("writtenAnswer"),
+                        correctAnswer = json.optString("correctAnswer"),
+                        writtenStrokeGroups = emptyList(),
+                    ),
+                )
+            }
+        }
+    }
+
+    private fun List<KanjiWritingReview>.toWritingJsonArray(): JSONArray =
+        JSONArray().also { jsonArray ->
+            forEach { review ->
+                jsonArray.put(
+                    JSONObject()
+                        .put("questionId", review.questionId)
+                        .put("questionNumber", review.questionNumber)
+                        .put("sentence", review.sentence)
+                        .put("sentenceReading", review.sentenceReading)
+                        .put("markedSentence", review.markedSentence)
+                        .put("markedSentenceReading", review.markedSentenceReading)
+                        .put("targetText", review.targetText)
+                        .put("targetReading", review.targetReading)
+                        .put("englishSentence", review.englishSentence)
+                        .put("spanishSentence", review.spanishSentence)
+                        .put("writtenAnswer", review.writtenAnswer)
+                        .put("correctAnswer", review.correctAnswer),
+                )
+            }
+        }
+
+    private fun JSONObject.optStringOrNull(name: String): String? =
+        if (isNull(name)) null else optString(name)
+
+    private companion object {
+        const val KEY_HISTORY_ENTRIES = "history_entries"
+        const val MAX_HISTORY_COUNT = 50
+    }
+}
+
 class SharedPreferencesKanjiSettingsStore(
     private val sharedPreferences: SharedPreferences,
 ) : KanjiSettingsStore {
@@ -789,6 +1110,19 @@ private class InMemoryKanjiSettingsStore : KanjiSettingsStore {
         settings = settings.copy(
             readingSecondsPerQuestion = readingSecondsPerQuestion.toReadingTimerSeconds(),
         )
+    }
+}
+
+private class InMemoryKanjiHistoryStore : KanjiHistoryStore {
+    private var historyEntries = emptyList<KanjiHistoryEntry>()
+
+    override fun loadHistory(): List<KanjiHistoryEntry> = historyEntries
+
+    override fun saveEntry(entry: KanjiHistoryEntry) {
+        historyEntries = (listOf(entry) + historyEntries)
+            .distinctBy { it.id }
+            .sortedByDescending { it.completedAtMillis }
+            .take(50)
     }
 }
 

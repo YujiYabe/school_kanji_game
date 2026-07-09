@@ -38,9 +38,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -62,6 +60,9 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -93,14 +94,28 @@ fun KanjiScreen(
     }
 
     Scaffold(modifier = modifier.fillMaxSize()) { paddingValues ->
+        val selectedHistoryEntry = uiState.selectedHistoryEntry
         when {
+            selectedHistoryEntry != null -> HistoryDetailScreen(
+                entry = selectedHistoryEntry,
+                onBack = viewModel::hideHistoryDetail,
+                modifier = Modifier.padding(paddingValues),
+            )
+
+            uiState.isHistoryVisible -> HistoryScreen(
+                historyEntries = uiState.historyEntries,
+                onBack = viewModel::hideHistory,
+                onOpenDetail = viewModel::showHistoryDetail,
+                modifier = Modifier.padding(paddingValues),
+            )
+
             !uiState.isSessionStarted -> StartSettingsScreen(
                 uiState = uiState,
                 onGradeSelected = viewModel::setSelectedGrade,
                 onQuestionCountChanged = viewModel::setQuestionCount,
                 onTimerChanged = viewModel::setReadingSecondsPerQuestion,
-                onStartReading = { viewModel.startReadingMode() },
-                onStartWriting = viewModel::startWritingMode,
+                onStart = { viewModel.startReadingMode() },
+                onHistory = viewModel::showHistory,
                 modifier = Modifier.padding(paddingValues),
             )
 
@@ -134,11 +149,10 @@ private fun StartSettingsScreen(
     onGradeSelected: (Int) -> Unit,
     onQuestionCountChanged: (Int) -> Unit,
     onTimerChanged: (Int) -> Unit,
-    onStartReading: () -> Unit,
-    onStartWriting: () -> Unit,
+    onStart: () -> Unit,
+    onHistory: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var selectedMode by remember { mutableStateOf(LearningMode.Reading) }
     val scrollState = rememberScrollState()
 
     Box(
@@ -200,61 +214,8 @@ private fun StartSettingsScreen(
                     onValueChanged = onQuestionCountChanged,
                 )
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    Button(
-                        onClick = { selectedMode = LearningMode.Reading },
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(56.dp),
-                        shape = RoundedCornerShape(8.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (selectedMode == LearningMode.Reading) {
-                                Color(0xFF86DC23)
-                            } else {
-                                Color(0xFF1F73E8)
-                            },
-                            contentColor = if (selectedMode == LearningMode.Reading) {
-                                Color(0xFF16408F)
-                            } else {
-                                Color.White
-                            },
-                        ),
-                    ) {
-                        Text(text = "読み", fontSize = 22.sp, fontWeight = FontWeight.Black)
-                    }
-                    Button(
-                        onClick = { selectedMode = LearningMode.Writing },
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(56.dp),
-                        shape = RoundedCornerShape(8.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (selectedMode == LearningMode.Writing) {
-                                Color(0xFF86DC23)
-                            } else {
-                                Color(0xFF1F73E8)
-                            },
-                            contentColor = if (selectedMode == LearningMode.Writing) {
-                                Color(0xFF16408F)
-                            } else {
-                                Color.White
-                            },
-                        ),
-                    ) {
-                        Text(text = "書き", fontSize = 22.sp, fontWeight = FontWeight.Black)
-                    }
-                }
-
                 Button(
-                    onClick = {
-                        when (selectedMode) {
-                            LearningMode.Reading -> onStartReading()
-                            LearningMode.Writing -> onStartWriting()
-                        }
-                    },
+                    onClick = onStart,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(62.dp),
@@ -265,6 +226,214 @@ private fun StartSettingsScreen(
                     ),
                 ) {
                     Text(text = "スタート", fontSize = 24.sp, fontWeight = FontWeight.Black)
+                }
+
+                OutlinedButton(
+                    onClick = onHistory,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(54.dp),
+                    shape = RoundedCornerShape(8.dp),
+                ) {
+                    Text(text = "履歴", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HistoryScreen(
+    historyEntries: List<KanjiHistoryEntry>,
+    onBack: () -> Unit,
+    onOpenDetail: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .navigationBarsPadding()
+            .padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            OutlinedButton(
+                onClick = onBack,
+                shape = RoundedCornerShape(8.dp),
+            ) {
+                Text(text = "戻る", fontWeight = FontWeight.Bold)
+            }
+            Text(
+                text = "履歴",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Black,
+            )
+        }
+
+        if (historyEntries.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = "履歴はまだありません",
+                    color = MaterialTheme.colorScheme.secondary,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp,
+                )
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                items(
+                    count = historyEntries.size,
+                    key = { index -> historyEntries[index].id },
+                ) { index ->
+                    HistoryRow(
+                        entry = historyEntries[index],
+                        onOpenDetail = onOpenDetail,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HistoryRow(
+    entry: KanjiHistoryEntry,
+    onOpenDetail: (String) -> Unit,
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(8.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Text(
+                    text = entry.completedAtMillis.formatHistoryDateTime(),
+                    fontWeight = FontWeight.Black,
+                    fontSize = 17.sp,
+                    lineHeight = 22.sp,
+                )
+                Text(
+                    text = "${entry.grade}年 / ${entry.questionCount}問 / ${entry.readingSecondsPerQuestion.formatTimerText()}",
+                    color = MaterialTheme.colorScheme.secondary,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 15.sp,
+                    lineHeight = 20.sp,
+                )
+            }
+            Button(
+                onClick = { onOpenDetail(entry.id) },
+                shape = RoundedCornerShape(8.dp),
+            ) {
+                Text(text = "詳細", fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
+
+@Composable
+private fun HistoryDetailScreen(
+    entry: KanjiHistoryEntry,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .navigationBarsPadding()
+            .padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            OutlinedButton(
+                onClick = onBack,
+                shape = RoundedCornerShape(8.dp),
+            ) {
+                Text(text = "戻る", fontWeight = FontWeight.Bold)
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "履歴詳細",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Black,
+                )
+                Text(
+                    text = "${entry.grade}年 / ${entry.questionCount}問 / ${entry.readingSecondsPerQuestion.formatTimerText()}",
+                    color = MaterialTheme.colorScheme.secondary,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
+        }
+
+        Text(
+            text = entry.completedAtMillis.formatHistoryDateTime(),
+            color = MaterialTheme.colorScheme.secondary,
+            fontWeight = FontWeight.Bold,
+        )
+
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f),
+            shape = RoundedCornerShape(8.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant,
+        ) {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                if (entry.readingReviews.isNotEmpty()) {
+                    item(key = "history-reading-header") {
+                        ReviewSectionHeader(text = "読み")
+                    }
+                    items(
+                        count = entry.readingReviews.size,
+                        key = { index -> "history-reading-$index-${entry.readingReviews[index].questionId}" },
+                    ) { index ->
+                        ReadingReviewRow(
+                            review = entry.readingReviews[index],
+                            showCorrectAnswer = true,
+                        )
+                    }
+                }
+                if (entry.writingReviews.isNotEmpty()) {
+                    item(key = "history-writing-header") {
+                        ReviewSectionHeader(text = "書き")
+                    }
+                    items(
+                        count = entry.writingReviews.size,
+                        key = { index -> "history-writing-$index-${entry.writingReviews[index].questionId}" },
+                    ) { index ->
+                        WritingReviewRow(review = entry.writingReviews[index])
+                    }
                 }
             }
         }
@@ -372,6 +541,9 @@ private fun Int.formatTimerText(): String {
     }
 }
 
+private fun Long.formatHistoryDateTime(): String =
+    SimpleDateFormat("yyyy/MM/dd HH:mm", Locale.getDefault()).format(Date(this))
+
 @Composable
 private fun ReadingQuizScreen(
     uiState: KanjiUiState,
@@ -423,7 +595,7 @@ private fun ReadingQuizScreen(
             items(uiState.shuffledReadingAnswers) { answer ->
                 Button(
                     onClick = { onAnswerSelected(answer) },
-                    modifier = Modifier.height(64.dp),
+                    modifier = Modifier.height(96.dp),
                 ) {
                     Text(answer, style = MaterialTheme.typography.titleMedium)
                 }
@@ -479,23 +651,44 @@ private fun WritingQuizScreen(
         )
 
         BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-            val canvasWidth = with(density) { maxWidth.toPx() }
+            val actionGap = 12.dp
+            val canvasWidth = with(density) { (maxWidth - actionGap).toPx() * 4f / 5f }
             val canvasHeight = with(density) { 280.dp.toPx() }
 
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(actionGap),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
                 KanjiCanvasView(
                     strokes = uiState.strokes,
                     onStrokesChanged = onStrokesChanged,
+                    modifier = Modifier.weight(4f),
                 )
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    OutlinedButton(onClick = onClear) {
+
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(280.dp),
+                ) {
+                    OutlinedButton(
+                        onClick = onClear,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
+                        shape = RoundedCornerShape(8.dp),
+                    ) {
                         Text("クリア")
                     }
                     Button(
                         onClick = { onJudge(canvasWidth, canvasHeight) },
                         enabled = uiState.recognitionState != RecognitionState.Loading,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
+                        shape = RoundedCornerShape(8.dp),
                     ) {
-                        Text("判定")
+                        Text("確定")
                     }
                 }
             }
@@ -543,16 +736,16 @@ private fun TranslationSentences(
         if (englishSentence.isNotBlank()) {
             Text(
                 text = "EN: $englishSentence",
-                style = MaterialTheme.typography.bodyLarge,
-                lineHeight = 24.sp,
+                fontSize = 24.sp,
+                lineHeight = 32.sp,
                 color = MaterialTheme.colorScheme.secondary,
             )
         }
         if (spanishSentence.isNotBlank()) {
             Text(
                 text = "ES: $spanishSentence",
-                style = MaterialTheme.typography.bodyLarge,
-                lineHeight = 24.sp,
+                fontSize = 24.sp,
+                lineHeight = 32.sp,
                 color = MaterialTheme.colorScheme.secondary,
             )
         }
@@ -592,27 +785,18 @@ private fun ResultScreen(
             fontWeight = FontWeight.Black,
         )
 
-        if (uiState.mode == LearningMode.Reading) {
-            Text(
-                text = "${uiState.readingOriginalQuestionCount} / ${uiState.readingOriginalQuestionCount} 点",
-                fontSize = 52.sp,
-                lineHeight = 60.sp,
-                fontWeight = FontWeight.Black,
-                textAlign = TextAlign.Center,
-            )
-        } else {
-            Text(
-                text = "全問完了",
-                fontSize = 44.sp,
-                lineHeight = 52.sp,
-                fontWeight = FontWeight.Black,
-                textAlign = TextAlign.Center,
-            )
-        }
+        Text(
+            text = "書き 全問完了",
+            fontSize = 42.sp,
+            lineHeight = 48.sp,
+            fontWeight = FontWeight.Black,
+            textAlign = TextAlign.Center,
+        )
 
         KanjiReviewList(
             uiState = uiState,
             showCorrectAnswer = true,
+            showReadingReviews = false,
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth(),
@@ -636,8 +820,7 @@ private fun RetryResultScreen(
     onRetryWrongQuestions: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val wrongReviews = uiState.readingAllReviews
-        .ifEmpty { uiState.readingReviews }
+    val wrongReviews = uiState.readingReviews
         .filterNot { it.isCorrect }
 
     Column(
@@ -655,7 +838,7 @@ private fun RetryResultScreen(
         )
 
         Text(
-            text = "${wrongReviews.size}問をもう一度",
+            text = "間違った問題 ${wrongReviews.size}問",
             fontSize = 40.sp,
             lineHeight = 46.sp,
             fontWeight = FontWeight.Black,
@@ -686,6 +869,7 @@ private fun RetryResultScreen(
 private fun KanjiReviewList(
     uiState: KanjiUiState,
     showCorrectAnswer: Boolean,
+    showReadingReviews: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     Surface(
@@ -699,28 +883,45 @@ private fun KanjiReviewList(
             contentPadding = PaddingValues(12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            if (uiState.mode == LearningMode.Reading) {
-                val allReviews = uiState.readingAllReviews.ifEmpty { uiState.readingReviews }
-                val reviews = if (uiState.resultPhase == ResultPhase.RetryNeeded) {
-                    allReviews.filterNot { it.isCorrect }
-                } else {
-                    allReviews
-                }
-                reviews.forEach { review ->
-                    item(key = review.questionId) {
-                        ReadingReviewRow(
-                            review = review,
-                            showCorrectAnswer = showCorrectAnswer,
-                        )
-                    }
-                }
+            val isRetryResult = uiState.mode == LearningMode.Reading &&
+                uiState.resultPhase == ResultPhase.RetryNeeded
+            val readingReviews = if (isRetryResult) {
+                uiState.readingReviews
             } else {
-                val reviews = uiState.writingReviews.ifEmpty {
+                uiState.readingAllReviews.ifEmpty { uiState.readingReviews }
+            }
+            if (showReadingReviews && readingReviews.isNotEmpty()) {
+                item(key = "reading-header") {
+                    ReviewSectionHeader(text = "読み")
+                }
+                val reviews = if (isRetryResult) {
+                    readingReviews.filterNot { it.isCorrect }
+                } else {
+                    readingReviews
+                }
+                items(
+                    count = reviews.size,
+                    key = { index -> "reading-${reviews[index].questionId}" },
+                ) { index ->
+                    ReadingReviewRow(
+                        review = reviews[index],
+                        showCorrectAnswer = showCorrectAnswer,
+                    )
+                }
+            }
+
+            if (!isRetryResult) {
+                val writingReviews = uiState.writingReviews.ifEmpty {
                     uiState.questions.mapIndexed { index, question ->
                         KanjiWritingReview(
                             questionId = question.id,
                             questionNumber = index + 1,
                             sentence = question.fullSentence,
+                            sentenceReading = question.sentenceReading,
+                            markedSentence = question.markedSentence,
+                            markedSentenceReading = question.markedSentenceReading,
+                            targetText = question.targetText,
+                            targetReading = question.readingAnswers.firstOrNull().orEmpty(),
                             englishSentence = question.englishSentence,
                             spanishSentence = question.spanishSentence,
                             writtenAnswer = "",
@@ -729,14 +930,31 @@ private fun KanjiReviewList(
                         )
                     }
                 }
-                reviews.forEach { review ->
-                    item(key = review.questionId) {
-                        WritingReviewRow(review = review)
+                if (writingReviews.isNotEmpty()) {
+                    item(key = "writing-header") {
+                        ReviewSectionHeader(text = "書き")
+                    }
+                    items(
+                        count = writingReviews.size,
+                        key = { index -> "writing-${writingReviews[index].questionId}" },
+                    ) { index ->
+                        WritingReviewRow(review = writingReviews[index])
                     }
                 }
             }
         }
     }
+}
+
+@Composable
+private fun ReviewSectionHeader(text: String) {
+    Text(
+        text = text,
+        color = MaterialTheme.colorScheme.secondary,
+        fontWeight = FontWeight.Black,
+        fontSize = 16.sp,
+        modifier = Modifier.padding(top = 4.dp, bottom = 2.dp),
+    )
 }
 
 @Composable
@@ -770,12 +988,16 @@ private fun ReadingReviewRow(
                 fontWeight = FontWeight.Bold,
                 fontSize = 13.sp,
             )
-            Text(
-                text = review.sentence,
-                color = textColor,
-                fontWeight = FontWeight.Black,
-                fontSize = 18.sp,
-                lineHeight = 24.sp,
+            RubySentence(
+                sentence = review.sentence,
+                sentenceReading = review.sentenceReading,
+                markedSentence = review.markedSentence,
+                markedSentenceReading = review.markedSentenceReading,
+                targetText = review.targetText,
+                targetReading = review.targetReading,
+                textColor = textColor,
+                textSize = 27.sp,
+                modifier = Modifier.weight(1f),
             )
         }
         ReviewTranslationSentences(
@@ -814,34 +1036,124 @@ private fun WritingReviewRow(
                 fontWeight = FontWeight.Bold,
                 fontSize = 13.sp,
             )
-            Text(
-                text = review.sentence,
-                color = Color.Black,
-                fontWeight = FontWeight.Black,
-                fontSize = 18.sp,
-                lineHeight = 24.sp,
+            RubySentence(
+                sentence = review.sentence,
+                sentenceReading = review.sentenceReading,
+                markedSentence = review.markedSentence,
+                markedSentenceReading = review.markedSentenceReading,
+                targetText = review.targetText,
+                targetReading = review.targetReading,
+                textColor = Color.Black,
+                textSize = 27.sp,
+                modifier = Modifier.weight(1f),
             )
         }
         ReviewTranslationSentences(
             englishSentence = review.englishSentence,
             spanishSentence = review.spanishSentence,
         )
-        Text(
-            text = "書いた文字: ${review.writtenAnswer.ifBlank { "未記録" }}   正解: ${review.correctAnswer}",
-            color = Color.Black,
-            fontWeight = FontWeight.Bold,
-            fontSize = 15.sp,
-            lineHeight = 20.sp,
-        )
-        if (review.writtenStrokeGroups.isNotEmpty()) {
-            WrittenAnswerPreview(
-                strokeGroups = review.writtenStrokeGroups,
-                modifier = Modifier.fillMaxWidth(),
-            )
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            AnswerComparisonColumn(
+                label = "正解",
+                modifier = Modifier.weight(1f),
+            ) {
+                CorrectAnswerPreview(answer = review.correctAnswer)
+            }
+            AnswerComparisonColumn(
+                label = "手書き",
+                modifier = Modifier.weight(1f),
+            ) {
+                if (review.writtenStrokeGroups.isNotEmpty()) {
+                    WrittenAnswerPreview(strokeGroups = review.writtenStrokeGroups)
+                } else if (review.writtenAnswer.isNotBlank()) {
+                    CorrectAnswerPreview(answer = review.writtenAnswer)
+                } else {
+                    EmptyWrittenAnswerPreview()
+                }
+            }
         }
     }
 }
 
+@Composable
+private fun AnswerComparisonColumn(
+    label: String,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text(
+            text = label,
+            color = Color(0xFF4B5563),
+            fontWeight = FontWeight.Bold,
+            fontSize = 13.sp,
+            lineHeight = 18.sp,
+        )
+        content()
+    }
+}
+
+@Composable
+private fun CorrectAnswerPreview(
+    answer: String,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(92.dp)
+            .background(Color(0xFFF9FAFB), RoundedCornerShape(8.dp))
+            .border(1.dp, Color(0xFFE5E7EB), RoundedCornerShape(8.dp))
+            .padding(8.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Row(
+            modifier = Modifier.fillMaxSize(),
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            answer.ifBlank { "未記録" }.forEach { char ->
+                Text(
+                    text = char.toString(),
+                    color = Color.Black,
+                    fontWeight = FontWeight.Black,
+                    fontSize = 38.sp,
+                    lineHeight = 44.sp,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun EmptyWrittenAnswerPreview(
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(92.dp)
+            .background(Color(0xFFF9FAFB), RoundedCornerShape(8.dp))
+            .border(1.dp, Color(0xFFE5E7EB), RoundedCornerShape(8.dp)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = "未記録",
+            color = Color(0xFF6B7280),
+            fontWeight = FontWeight.Bold,
+            fontSize = 18.sp,
+        )
+    }
+}
 @Composable
 private fun ReviewTranslationSentences(
     englishSentence: String,
@@ -854,16 +1166,16 @@ private fun ReviewTranslationSentences(
             Text(
                 text = "EN: $englishSentence",
                 color = Color(0xFF4B5563),
-                fontSize = 14.sp,
-                lineHeight = 19.sp,
+                fontSize = 21.sp,
+                lineHeight = 28.sp,
             )
         }
         if (spanishSentence.isNotBlank()) {
             Text(
                 text = "ES: $spanishSentence",
                 color = Color(0xFF4B5563),
-                fontSize = 14.sp,
-                lineHeight = 19.sp,
+                fontSize = 21.sp,
+                lineHeight = 28.sp,
             )
         }
     }
@@ -876,6 +1188,7 @@ private fun WrittenAnswerPreview(
 ) {
     Canvas(
         modifier = modifier
+            .fillMaxWidth()
             .height(92.dp)
             .background(Color(0xFFF9FAFB), RoundedCornerShape(8.dp))
             .border(1.dp, Color(0xFFE5E7EB), RoundedCornerShape(8.dp))
@@ -983,7 +1296,7 @@ private fun RubySentence(
     modifier: Modifier = Modifier,
     textColor: Color = Color.Unspecified,
     targetColor: Color = Color(0xFF2563EB),
-    textSize: TextUnit = 24.sp,
+    textSize: TextUnit = 36.sp,
 ) {
     val tokens = remember(sentence, sentenceReading, markedSentence, markedSentenceReading, targetText, targetReading) {
         rubyTokens(
@@ -1032,8 +1345,8 @@ private fun RubyTokenText(
     ) {
         Text(
             text = rubyText,
-            fontSize = 10.sp,
-            lineHeight = 10.sp,
+            fontSize = 15.sp,
+            lineHeight = 15.sp,
             color = if (token.ruby.isBlank()) Color.Transparent else MaterialTheme.colorScheme.secondary,
             maxLines = 1,
             overflow = TextOverflow.Visible,
@@ -1041,7 +1354,7 @@ private fun RubyTokenText(
         Text(
             text = token.text,
             fontSize = textSize,
-            lineHeight = 30.sp,
+            lineHeight = 45.sp,
             color = bodyColor,
             fontWeight = bodyWeight,
         )
@@ -1057,7 +1370,12 @@ private fun rubyTokens(
     targetReading: String,
 ): List<RubyToken> {
     if (sentence.isBlank()) return emptyList()
-    explicitRubyTokens(markedSentence, markedSentenceReading)
+    explicitRubyTokens(
+        markedSentence = markedSentence,
+        markedSentenceReading = markedSentenceReading,
+        targetText = targetText,
+        targetReading = targetReading,
+    )
         ?.let { return it.mergePlainNeighbors() }
     if (sentenceReading.isBlank()) return targetOnlyTokens(sentence, targetText)
 
@@ -1122,6 +1440,8 @@ private data class MarkedSegment(
 private fun explicitRubyTokens(
     markedSentence: String,
     markedSentenceReading: String,
+    targetText: String,
+    targetReading: String,
 ): List<RubyToken>? {
     if (!markedSentence.hasRubyMarkers() || !markedSentenceReading.hasRubyMarkers()) return null
 
@@ -1137,7 +1457,13 @@ private fun explicitRubyTokens(
                     val readingSegment = readingMarkedSegments.getOrNull(readingMarkerIndex)
                     if (readingSegment?.marker != '[') return null
                     readingMarkerIndex++
-                    add(RubyToken(sentenceSegment.text, isTarget = true))
+                    add(
+                        RubyToken(
+                            text = sentenceSegment.text,
+                            ruby = targetReading.takeIf { sentenceSegment.text == targetText }.orEmpty(),
+                            isTarget = true,
+                        ),
+                    )
                 }
                 '{' -> {
                     val readingSegment = readingMarkedSegments.getOrNull(readingMarkerIndex)
@@ -1210,7 +1536,7 @@ private fun MutableList<RubyToken>.addTargetRunTokens(
 
     if (targetReadingStart < 0) {
         if (prefixText.isNotEmpty()) add(RubyToken(prefixText, runReading))
-        add(RubyToken(targetText, isTarget = true))
+        add(RubyToken(targetText, ruby = targetReading, isTarget = true))
         if (suffixText.isNotEmpty()) add(RubyToken(suffixText))
         return
     }
@@ -1222,7 +1548,7 @@ private fun MutableList<RubyToken>.addTargetRunTokens(
     if (prefixText.isNotEmpty()) {
         add(RubyToken(prefixText, prefixReading))
     }
-    add(RubyToken(targetText, isTarget = true))
+    add(RubyToken(targetText, ruby = targetReading, isTarget = true))
     if (suffixText.isNotEmpty()) {
         add(RubyToken(suffixText, suffixReading))
     }
