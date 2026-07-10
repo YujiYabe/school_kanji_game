@@ -142,6 +142,7 @@ fun KanjiScreen(
                 onStrokesChanged = viewModel::updateWritingStrokes,
                 onClear = viewModel::clearWritingCanvas,
                 onJudge = viewModel::judgeCurrentWritingCharacter,
+                onSkip = viewModel::skipCurrentWritingQuestion,
                 modifier = Modifier.padding(paddingValues),
             )
         }
@@ -352,6 +353,8 @@ private fun HistoryRow(
     onOpenDetail: (String) -> Unit,
     onDelete: () -> Unit,
 ) {
+    val scoreText = entry.historyScoreSummaryText()
+
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(8.dp),
@@ -381,6 +384,13 @@ private fun HistoryRow(
                     fontSize = 15.sp,
                     lineHeight = 20.sp,
                 )
+                Text(
+                    text = scoreText,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Black,
+                    fontSize = 15.sp,
+                    lineHeight = 20.sp,
+                )
             }
             Button(
                 onClick = { onOpenDetail(entry.id) },
@@ -404,6 +414,12 @@ private fun HistoryDetailScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val readingCorrectCount = entry.readingReviews.count { it.isCorrect }
+    val readingTotalCount = entry.readingReviews.size
+    val writingCorrectCount = entry.writingReviews.count { it.isCorrectWritingReview() }
+    val writingTotalCount = entry.writingReviews.size
+    val scoreText = entry.historyScoreSummaryText()
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -441,6 +457,13 @@ private fun HistoryDetailScreen(
             color = MaterialTheme.colorScheme.secondary,
             fontWeight = FontWeight.Bold,
         )
+        Text(
+            text = scoreText,
+            color = MaterialTheme.colorScheme.primary,
+            fontWeight = FontWeight.Black,
+            fontSize = 18.sp,
+            lineHeight = 24.sp,
+        )
 
         Surface(
             modifier = Modifier
@@ -456,7 +479,10 @@ private fun HistoryDetailScreen(
             ) {
                 if (entry.readingReviews.isNotEmpty()) {
                     item(key = "history-reading-header") {
-                        ReviewSectionHeader(text = "読み")
+                        ReviewSectionHeader(
+                            text = "読み",
+                            scoreText = "$readingCorrectCount/$readingTotalCount",
+                        )
                     }
                     items(
                         count = entry.readingReviews.size,
@@ -470,7 +496,10 @@ private fun HistoryDetailScreen(
                 }
                 if (entry.writingReviews.isNotEmpty()) {
                     item(key = "history-writing-header") {
-                        ReviewSectionHeader(text = "書き")
+                        ReviewSectionHeader(
+                            text = "書き",
+                            scoreText = "$writingCorrectCount/$writingTotalCount",
+                        )
                     }
                     items(
                         count = entry.writingReviews.size,
@@ -588,6 +617,13 @@ private fun Int.formatTimerText(): String {
 private fun Long.formatHistoryDateTime(): String =
     SimpleDateFormat("yyyy/MM/dd HH:mm", Locale.getDefault()).format(Date(this))
 
+private fun KanjiHistoryEntry.historyScoreSummaryText(): String =
+    "読み ${readingReviews.count { it.isCorrect }}/${readingReviews.size} : " +
+        "書き ${writingReviews.count { it.isCorrectWritingReview() }}/${writingReviews.size}"
+
+private fun KanjiWritingReview.isCorrectWritingReview(): Boolean =
+    !isSkipped && writtenAnswer == correctAnswer
+
 @Composable
 private fun ReadingQuizScreen(
     uiState: KanjiUiState,
@@ -655,6 +691,7 @@ private fun WritingQuizScreen(
     onStrokesChanged: (List<DrawnStroke>) -> Unit,
     onClear: () -> Unit,
     onJudge: (Float, Float) -> Unit,
+    onSkip: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val question = uiState.currentQuestion ?: return
@@ -724,6 +761,16 @@ private fun WritingQuizScreen(
                         shape = RoundedCornerShape(8.dp),
                     ) {
                         Text("クリア")
+                    }
+                    OutlinedButton(
+                        onClick = onSkip,
+                        enabled = uiState.recognitionState != RecognitionState.Loading,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
+                        shape = RoundedCornerShape(8.dp),
+                    ) {
+                        Text("スキップ")
                     }
                     Button(
                         onClick = { onJudge(canvasWidth, canvasHeight) },
@@ -824,20 +871,6 @@ private fun ResultScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text(
-            text = "結果",
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Black,
-        )
-
-        Text(
-            text = "書き 全問完了",
-            fontSize = 42.sp,
-            lineHeight = 48.sp,
-            fontWeight = FontWeight.Black,
-            textAlign = TextAlign.Center,
-        )
-
         KanjiReviewList(
             uiState = uiState,
             showCorrectAnswer = true,
@@ -976,6 +1009,7 @@ private fun KanjiReviewList(
                             writtenAnswer = "",
                             correctAnswer = question.writingAnswer,
                             writtenStrokeGroups = emptyList(),
+                            isSkipped = false,
                         )
                     }
                 }
@@ -996,14 +1030,32 @@ private fun KanjiReviewList(
 }
 
 @Composable
-private fun ReviewSectionHeader(text: String) {
-    Text(
-        text = text,
-        color = MaterialTheme.colorScheme.secondary,
-        fontWeight = FontWeight.Black,
-        fontSize = 16.sp,
-        modifier = Modifier.padding(top = 4.dp, bottom = 2.dp),
-    )
+private fun ReviewSectionHeader(
+    text: String,
+    scoreText: String? = null,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 4.dp, bottom = 2.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = text,
+            color = MaterialTheme.colorScheme.secondary,
+            fontWeight = FontWeight.Black,
+            fontSize = 16.sp,
+        )
+        if (scoreText != null) {
+            Text(
+                text = scoreText,
+                color = MaterialTheme.colorScheme.secondary,
+                fontWeight = FontWeight.Black,
+                fontSize = 16.sp,
+            )
+        }
+    }
 }
 
 @Composable
@@ -1073,6 +1125,9 @@ private fun ReadingReviewRow(
 private fun WritingReviewRow(
     review: KanjiWritingReview,
 ) {
+    val isCorrect = review.isCorrectWritingReview()
+    val writtenAnswerColor = if (isCorrect) Color.Black else Color(0xFFD00000)
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -1122,12 +1177,26 @@ private fun WritingReviewRow(
                 label = "手書き",
                 modifier = Modifier.weight(1f),
             ) {
-                if (review.writtenStrokeGroups.isNotEmpty()) {
-                    WrittenAnswerPreview(strokeGroups = review.writtenStrokeGroups)
+                if (review.isSkipped) {
+                    EmptyWrittenAnswerPreview(
+                        text = "スキップ",
+                        textColor = writtenAnswerColor,
+                    )
+                } else if (review.writtenStrokeGroups.isNotEmpty()) {
+                    WrittenAnswerPreview(
+                        strokeGroups = review.writtenStrokeGroups,
+                        strokeColor = writtenAnswerColor,
+                    )
                 } else if (review.writtenAnswer.isNotBlank()) {
-                    CorrectAnswerPreview(answer = review.writtenAnswer)
+                    CorrectAnswerPreview(
+                        answer = review.writtenAnswer,
+                        textColor = writtenAnswerColor,
+                    )
                 } else {
-                    EmptyWrittenAnswerPreview()
+                    EmptyWrittenAnswerPreview(
+                        text = "未記録",
+                        textColor = writtenAnswerColor,
+                    )
                 }
             }
         }
@@ -1159,6 +1228,7 @@ private fun AnswerComparisonColumn(
 private fun CorrectAnswerPreview(
     answer: String,
     modifier: Modifier = Modifier,
+    textColor: Color = Color.Black,
 ) {
     Box(
         modifier = modifier
@@ -1177,7 +1247,7 @@ private fun CorrectAnswerPreview(
             answer.ifBlank { "未記録" }.forEach { char ->
                 Text(
                     text = char.toString(),
-                    color = Color.Black,
+                    color = textColor,
                     fontWeight = FontWeight.Black,
                     fontSize = 38.sp,
                     lineHeight = 44.sp,
@@ -1192,6 +1262,8 @@ private fun CorrectAnswerPreview(
 @Composable
 private fun EmptyWrittenAnswerPreview(
     modifier: Modifier = Modifier,
+    text: String = "未記録",
+    textColor: Color = Color(0xFF6B7280),
 ) {
     Box(
         modifier = modifier
@@ -1202,8 +1274,8 @@ private fun EmptyWrittenAnswerPreview(
         contentAlignment = Alignment.Center,
     ) {
         Text(
-            text = "未記録",
-            color = Color(0xFF6B7280),
+            text = text,
+            color = textColor,
             fontWeight = FontWeight.Bold,
             fontSize = 18.sp,
         )
@@ -1240,6 +1312,7 @@ private fun ReviewTranslationSentences(
 private fun WrittenAnswerPreview(
     strokeGroups: List<List<DrawnStroke>>,
     modifier: Modifier = Modifier,
+    strokeColor: Color = Color(0xFF111827),
 ) {
     Canvas(
         modifier = modifier
@@ -1289,7 +1362,7 @@ private fun WrittenAnswerPreview(
                 if (strokePoints.size == 1) {
                     val point = strokePoints.first()
                     drawCircle(
-                        color = Color(0xFF111827),
+                        color = strokeColor,
                         radius = 4f,
                         center = androidx.compose.ui.geometry.Offset(
                             point.x * scale + offsetX,
@@ -1300,7 +1373,7 @@ private fun WrittenAnswerPreview(
                     transformedPath(stroke)?.let { path ->
                         drawPath(
                             path = path,
-                            color = Color(0xFF111827),
+                            color = strokeColor,
                             style = Stroke(
                                 width = 5f,
                                 cap = StrokeCap.Round,

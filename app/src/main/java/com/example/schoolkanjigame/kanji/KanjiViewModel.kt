@@ -89,6 +89,7 @@ data class KanjiWritingReview(
     val writtenAnswer: String,
     val correctAnswer: String,
     val writtenStrokeGroups: List<List<DrawnStroke>>,
+    val isSkipped: Boolean = false,
 )
 
 data class KanjiHistoryEntry(
@@ -530,6 +531,50 @@ class KanjiViewModel(
         }
     }
 
+    fun skipCurrentWritingQuestion() {
+        val state = uiState.value
+        if (
+            state.mode != LearningMode.Writing ||
+            state.isFinished ||
+            state.recognitionState == RecognitionState.Loading
+        ) {
+            return
+        }
+
+        val question = state.currentQuestion ?: return
+        val nextQuestionIndex = state.currentQuestionIndex + 1
+        val finished = nextQuestionIndex >= state.questions.size
+        val skippedStrokeGroups = if (state.strokes.isEmpty()) {
+            state.currentWritingStrokeGroups
+        } else {
+            state.currentWritingStrokeGroups + listOf(state.strokes)
+        }
+        val updatedWritingReviews = state.writingReviews + question.toWritingReview(
+            questionNumber = state.currentQuestionIndex + 1,
+            writtenAnswer = state.currentWritingAnswer,
+            writtenStrokeGroups = skippedStrokeGroups,
+            isSkipped = true,
+        )
+
+        if (finished) {
+            saveCompletedHistory(state, updatedWritingReviews)
+        }
+
+        _uiState.update {
+            it.copy(
+                currentQuestionIndex = nextQuestionIndex.coerceAtMost(it.questions.size),
+                currentWritingCharIndex = 0,
+                currentWritingAnswer = "",
+                currentWritingStrokeGroups = emptyList(),
+                writingReviews = updatedWritingReviews,
+                strokes = emptyList(),
+                recognitionState = RecognitionState.Idle,
+                isFinished = finished,
+                historyEntries = if (finished) historyStore.loadHistory() else it.historyEntries,
+            )
+        }
+    }
+
     fun judgeCurrentWritingCharacter(canvasWidth: Float, canvasHeight: Float) {
         val state = uiState.value
         if (state.mode != LearningMode.Writing || state.isFinished) return
@@ -707,11 +752,27 @@ class KanjiViewModel(
         }
 
         readingScreenActive = false
-        val writingQuestions = state.writingQuestions.ifEmpty { state.questions }
+        val unrecoverableReadingQuestionIds = updatedAllReviews
+            .filter { it.isUnrecoverable }
+            .map { it.questionId }
+            .toSet()
+        val writingQuestions = state.writingQuestions
+            .ifEmpty { state.questions }
+            .filterNot { it.id in unrecoverableReadingQuestionIds }
+
+        if (writingQuestions.isEmpty()) {
+            saveCompletedHistory(
+                state = state,
+                writingReviews = emptyList(),
+                readingReviews = updatedAllReviews.ifEmpty { updatedReviews },
+            )
+        }
+
         _uiState.update {
             it.copy(
                 mode = LearningMode.Writing,
                 questions = writingQuestions,
+                writingQuestions = writingQuestions,
                 currentQuestionIndex = 0,
                 shuffledReadingAnswers = emptyList(),
                 readingTimeRemaining = it.readingSecondsPerQuestion,
@@ -726,9 +787,12 @@ class KanjiViewModel(
                 strokes = emptyList(),
                 recognitionState = RecognitionState.Idle,
                 isFinished = writingQuestions.isEmpty(),
+                historyEntries = if (writingQuestions.isEmpty()) historyStore.loadHistory() else it.historyEntries,
             )
         }
-        prepareInkModel()
+        if (writingQuestions.isNotEmpty()) {
+            prepareInkModel()
+        }
     }
 
     private fun handleWritingRecognitionSuccess(recognizedCandidates: List<String>) {
@@ -771,19 +835,9 @@ class KanjiViewModel(
         val updatedWritingReviews = if (question == null) {
             state.writingReviews
         } else {
-            state.writingReviews + KanjiWritingReview(
-                questionId = question.id,
+            state.writingReviews + question.toWritingReview(
                 questionNumber = state.currentQuestionIndex + 1,
-                sentence = question.fullSentence,
-                sentenceReading = question.sentenceReading,
-                markedSentence = question.markedSentence,
-                markedSentenceReading = question.markedSentenceReading,
-                targetText = question.targetText,
-                targetReading = question.readingAnswers.firstOrNull().orEmpty(),
-                englishSentence = question.englishSentence,
-                spanishSentence = question.spanishSentence,
                 writtenAnswer = updatedWritingAnswer,
-                correctAnswer = question.writingAnswer,
                 writtenStrokeGroups = updatedWritingStrokeGroups,
             )
         }
@@ -808,6 +862,29 @@ class KanjiViewModel(
             )
         }
     }
+
+    private fun KanjiQuestion.toWritingReview(
+        questionNumber: Int,
+        writtenAnswer: String,
+        writtenStrokeGroups: List<List<DrawnStroke>>,
+        isSkipped: Boolean = false,
+    ): KanjiWritingReview =
+        KanjiWritingReview(
+            questionId = id,
+            questionNumber = questionNumber,
+            sentence = fullSentence,
+            sentenceReading = sentenceReading,
+            markedSentence = markedSentence,
+            markedSentenceReading = markedSentenceReading,
+            targetText = targetText,
+            targetReading = readingAnswers.firstOrNull().orEmpty(),
+            englishSentence = englishSentence,
+            spanishSentence = spanishSentence,
+            writtenAnswer = writtenAnswer,
+            correctAnswer = writingAnswer,
+            writtenStrokeGroups = writtenStrokeGroups,
+            isSkipped = isSkipped,
+        )
 
     override fun onCleared() {
         readingTimerJob?.cancel()
@@ -851,6 +928,7 @@ class KanjiViewModel(
     private fun saveCompletedHistory(
         state: KanjiUiState,
         writingReviews: List<KanjiWritingReview>,
+        readingReviews: List<KanjiAnswerReview> = state.readingAllReviews.ifEmpty { state.readingReviews },
     ) {
         val completedAtMillis = System.currentTimeMillis()
         historyStore.saveEntry(
@@ -861,8 +939,8 @@ class KanjiViewModel(
                 questionCount = state.readingOriginalQuestionCount.takeIf { it > 0 }
                     ?: state.questionCount,
                 readingSecondsPerQuestion = state.readingSecondsPerQuestion,
-                readingReviews = state.readingAllReviews.ifEmpty { state.readingReviews },
-                writingReviews = writingReviews.map { it.copy(writtenStrokeGroups = emptyList()) },
+                readingReviews = readingReviews,
+                writingReviews = writingReviews,
             ),
         )
     }
@@ -1065,6 +1143,8 @@ class SharedPreferencesKanjiHistoryStore(
         return buildList {
             for (index in 0 until length()) {
                 val json = optJSONObject(index) ?: continue
+                val writtenAnswer = json.optString("writtenAnswer")
+                val writtenStrokeGroups = json.optJSONArray("writtenStrokeGroups").toStrokeGroups()
                 add(
                     KanjiWritingReview(
                         questionId = json.optString("questionId"),
@@ -1077,9 +1157,13 @@ class SharedPreferencesKanjiHistoryStore(
                         targetReading = json.optString("targetReading"),
                         englishSentence = json.optString("englishSentence"),
                         spanishSentence = json.optString("spanishSentence"),
-                        writtenAnswer = json.optString("writtenAnswer"),
+                        writtenAnswer = writtenAnswer,
                         correctAnswer = json.optString("correctAnswer"),
-                        writtenStrokeGroups = emptyList(),
+                        writtenStrokeGroups = writtenStrokeGroups,
+                        isSkipped = json.optBoolean(
+                            "isSkipped",
+                            writtenAnswer.isBlank() && writtenStrokeGroups.isEmpty(),
+                        ),
                     ),
                 )
             }
@@ -1102,7 +1186,67 @@ class SharedPreferencesKanjiHistoryStore(
                         .put("englishSentence", review.englishSentence)
                         .put("spanishSentence", review.spanishSentence)
                         .put("writtenAnswer", review.writtenAnswer)
-                        .put("correctAnswer", review.correctAnswer),
+                        .put("correctAnswer", review.correctAnswer)
+                        .put("writtenStrokeGroups", review.writtenStrokeGroups.toStrokeGroupsJsonArray())
+                        .put("isSkipped", review.isSkipped),
+                )
+            }
+        }
+
+    private fun JSONArray?.toStrokeGroups(): List<List<DrawnStroke>> {
+        if (this == null) return emptyList()
+        return buildList {
+            for (groupIndex in 0 until length()) {
+                val strokeGroupJson = optJSONArray(groupIndex) ?: continue
+                add(strokeGroupJson.toStrokes())
+            }
+        }
+    }
+
+    private fun JSONArray.toStrokes(): List<DrawnStroke> =
+        buildList {
+            for (strokeIndex in 0 until length()) {
+                val strokeJson = optJSONArray(strokeIndex) ?: continue
+                add(DrawnStroke(points = strokeJson.toInkPoints()))
+            }
+        }
+
+    private fun JSONArray.toInkPoints(): List<InkPoint> =
+        buildList {
+            for (pointIndex in 0 until length()) {
+                val pointJson = optJSONObject(pointIndex) ?: continue
+                add(
+                    InkPoint(
+                        x = pointJson.optDouble("x").toFloat(),
+                        y = pointJson.optDouble("y").toFloat(),
+                        timestampMillis = pointJson.optLong("timestampMillis"),
+                    ),
+                )
+            }
+        }
+
+    private fun List<List<DrawnStroke>>.toStrokeGroupsJsonArray(): JSONArray =
+        JSONArray().also { strokeGroupsJson ->
+            forEach { strokes ->
+                strokeGroupsJson.put(strokes.toStrokesJsonArray())
+            }
+        }
+
+    private fun List<DrawnStroke>.toStrokesJsonArray(): JSONArray =
+        JSONArray().also { strokesJson ->
+            forEach { stroke ->
+                strokesJson.put(stroke.points.toInkPointsJsonArray())
+            }
+        }
+
+    private fun List<InkPoint>.toInkPointsJsonArray(): JSONArray =
+        JSONArray().also { pointsJson ->
+            forEach { point ->
+                pointsJson.put(
+                    JSONObject()
+                        .put("x", point.x)
+                        .put("y", point.y)
+                        .put("timestampMillis", point.timestampMillis),
                 )
             }
         }
