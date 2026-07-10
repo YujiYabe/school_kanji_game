@@ -30,6 +30,8 @@ import kotlin.coroutines.resumeWithException
 import org.json.JSONArray
 import org.json.JSONObject
 
+private const val MAX_READING_ATTEMPTS = 3
+
 data class KanjiQuestion(
     val id: String,
     val grade: Int,
@@ -57,6 +59,7 @@ data class DrawnStroke(
 data class KanjiAnswerReview(
     val questionId: String,
     val questionNumber: Int,
+    val attemptNumber: Int = 1,
     val sentence: String,
     val sentenceReading: String = "",
     val markedSentence: String = "",
@@ -68,6 +71,8 @@ data class KanjiAnswerReview(
     val selectedAnswer: String?,
     val correctAnswer: String,
     val isCorrect: Boolean,
+    val isUnrecoverable: Boolean = false,
+    val correctAnswerIndex: Int = -1,
 )
 
 data class KanjiWritingReview(
@@ -408,6 +413,17 @@ class KanjiViewModel(
         }
     }
 
+    fun deleteHistoryEntry(entryId: String) {
+        historyStore.deleteEntry(entryId)
+        val updatedHistory = historyStore.loadHistory()
+        _uiState.update {
+            it.copy(
+                historyEntries = updatedHistory,
+                selectedHistoryEntry = it.selectedHistoryEntry?.takeUnless { entry -> entry.id == entryId },
+            )
+        }
+    }
+
     fun setReadingScreenActive(active: Boolean) {
         readingScreenActive = active
         if (
@@ -434,18 +450,19 @@ class KanjiViewModel(
         val state = uiState.value
         if (state.mode != LearningMode.Reading || state.resultPhase != ResultPhase.RetryNeeded) return
 
+        val previousReviewsById = state.readingAllReviews.associateBy { it.questionId }
         val questionsById = (state.writingQuestions + state.questions)
             .distinctBy { it.id }
             .associateBy { it.id }
         val retryQuestions = state.readingReviews
-            .filterNot { it.isCorrect }
+            .filter { !it.isCorrect && !it.isUnrecoverable }
             .mapNotNull { questionsById[it.questionId] }
 
         if (retryQuestions.isEmpty()) {
             _uiState.update {
                 it.copy(
                     resultPhase = ResultPhase.Final,
-                    readingCorrectCount = it.readingOriginalQuestionCount,
+                    readingCorrectCount = it.readingAllReviews.count { review -> review.isCorrect },
                 )
             }
             return
@@ -457,7 +474,9 @@ class KanjiViewModel(
             it.copy(
                 questions = retryQuestions,
                 currentQuestionIndex = 0,
-                shuffledReadingAnswers = retryQuestions.firstOrNull()?.readingAnswers.orEmpty().shuffled(),
+                shuffledReadingAnswers = retryQuestions.firstOrNull()
+                    ?.shuffledReadingAnswersAvoiding(previousReviewsById)
+                    .orEmpty(),
                 readingTimeRemaining = it.readingSecondsPerQuestion,
                 readingCorrectCount = 0,
                 readingRetryRound = it.readingRetryRound + 1,
@@ -605,9 +624,11 @@ class KanjiViewModel(
         val correctAnswer = question.readingAnswers.firstOrNull().orEmpty()
         val wasCorrect = selectedAnswer == correctAnswer
         val previousReview = state.readingAllReviews.firstOrNull { it.questionId == question.id }
+        val attemptNumber = (previousReview?.attemptNumber ?: 0) + 1
         val review = KanjiAnswerReview(
             questionId = question.id,
             questionNumber = previousReview?.questionNumber ?: state.currentQuestionIndex + 1,
+            attemptNumber = attemptNumber,
             sentence = question.fullSentence,
             sentenceReading = question.sentenceReading,
             markedSentence = question.markedSentence,
@@ -619,6 +640,8 @@ class KanjiViewModel(
             selectedAnswer = selectedAnswer,
             correctAnswer = correctAnswer,
             isCorrect = wasCorrect,
+            isUnrecoverable = !wasCorrect && attemptNumber >= MAX_READING_ATTEMPTS,
+            correctAnswerIndex = state.shuffledReadingAnswers.indexOf(correctAnswer),
         )
         val nextIndex = state.currentQuestionIndex + 1
         val finished = nextIndex >= state.questions.size
@@ -634,9 +657,11 @@ class KanjiViewModel(
             )
         } else {
             _uiState.update {
+                val previousReviewsById = updatedAllReviews.associateBy { review -> review.questionId }
                 it.copy(
                     currentQuestionIndex = nextIndex,
-                    shuffledReadingAnswers = it.questions[nextIndex].readingAnswers.shuffled(),
+                    shuffledReadingAnswers = it.questions[nextIndex]
+                        .shuffledReadingAnswersAvoiding(previousReviewsById),
                     readingTimeRemaining = it.readingSecondsPerQuestion,
                     readingCorrectCount = it.readingCorrectCount + if (wasCorrect) 1 else 0,
                     readingReviews = updatedReviews,
@@ -658,7 +683,7 @@ class KanjiViewModel(
         val allSessionQuestions = (state.writingQuestions + state.questions).distinctBy { it.id }
         val questionsById = allSessionQuestions.associateBy { it.id }
         val retryQuestions = updatedReviews
-            .filterNot { it.isCorrect }
+            .filter { !it.isCorrect && !it.isUnrecoverable }
             .mapNotNull { questionsById[it.questionId] }
 
         readingTimerJob?.cancel()
@@ -690,7 +715,7 @@ class KanjiViewModel(
                 currentQuestionIndex = 0,
                 shuffledReadingAnswers = emptyList(),
                 readingTimeRemaining = it.readingSecondsPerQuestion,
-                readingCorrectCount = it.readingOriginalQuestionCount,
+                readingCorrectCount = updatedAllReviews.count { review -> review.isCorrect },
                 readingReviews = updatedReviews,
                 readingAllReviews = updatedAllReviews,
                 resultPhase = ResultPhase.Final,
@@ -842,6 +867,25 @@ class KanjiViewModel(
         )
     }
 
+    private fun KanjiQuestion.shuffledReadingAnswersAvoiding(
+        previousReviewsById: Map<String, KanjiAnswerReview>,
+    ): List<String> {
+        val previousCorrectAnswerIndex = previousReviewsById[id]?.correctAnswerIndex ?: -1
+        val answers = readingAnswers.shuffled().toMutableList()
+        val currentCorrectAnswerIndex = answers.indexOf(readingAnswers.firstOrNull().orEmpty())
+        if (
+            previousCorrectAnswerIndex >= 0 &&
+            currentCorrectAnswerIndex == previousCorrectAnswerIndex &&
+            answers.size > 1
+        ) {
+            val swapIndex = if (currentCorrectAnswerIndex == answers.lastIndex) 0 else currentCorrectAnswerIndex + 1
+            val correctAnswer = answers[currentCorrectAnswerIndex]
+            answers[currentCorrectAnswerIndex] = answers[swapIndex]
+            answers[swapIndex] = correctAnswer
+        }
+        return answers
+    }
+
     private fun questionsForGrade(grade: Int): List<KanjiQuestion> =
         questionBank.filter { it.grade == grade.coerceIn(1, 6) }
 
@@ -899,6 +943,7 @@ interface KanjiSettingsStore {
 interface KanjiHistoryStore {
     fun loadHistory(): List<KanjiHistoryEntry>
     fun saveEntry(entry: KanjiHistoryEntry)
+    fun deleteEntry(entryId: String)
 }
 
 class SharedPreferencesKanjiHistoryStore(
@@ -924,8 +969,17 @@ class SharedPreferencesKanjiHistoryStore(
             .distinctBy { it.id }
             .sortedByDescending { it.completedAtMillis }
             .take(MAX_HISTORY_COUNT)
+        saveHistory(updatedHistory)
+    }
+
+    override fun deleteEntry(entryId: String) {
+        val updatedHistory = loadHistory().filterNot { it.id == entryId }
+        saveHistory(updatedHistory)
+    }
+
+    private fun saveHistory(historyEntries: List<KanjiHistoryEntry>) {
         val jsonArray = JSONArray()
-        updatedHistory.forEach { jsonArray.put(it.toJson()) }
+        historyEntries.forEach { jsonArray.put(it.toJson()) }
         sharedPreferences.edit()
             .putString(KEY_HISTORY_ENTRIES, jsonArray.toString())
             .apply()
@@ -961,6 +1015,7 @@ class SharedPreferencesKanjiHistoryStore(
                     KanjiAnswerReview(
                         questionId = json.optString("questionId"),
                         questionNumber = json.optInt("questionNumber"),
+                        attemptNumber = json.optInt("attemptNumber", 1).coerceAtLeast(1),
                         sentence = json.optString("sentence"),
                         sentenceReading = json.optString("sentenceReading"),
                         markedSentence = json.optString("markedSentence"),
@@ -972,6 +1027,8 @@ class SharedPreferencesKanjiHistoryStore(
                         selectedAnswer = json.optStringOrNull("selectedAnswer"),
                         correctAnswer = json.optString("correctAnswer"),
                         isCorrect = json.optBoolean("isCorrect"),
+                        isUnrecoverable = json.optBoolean("isUnrecoverable"),
+                        correctAnswerIndex = json.optInt("correctAnswerIndex", -1),
                     ),
                 )
             }
@@ -985,6 +1042,7 @@ class SharedPreferencesKanjiHistoryStore(
                     JSONObject()
                         .put("questionId", review.questionId)
                         .put("questionNumber", review.questionNumber)
+                        .put("attemptNumber", review.attemptNumber)
                         .put("sentence", review.sentence)
                         .put("sentenceReading", review.sentenceReading)
                         .put("markedSentence", review.markedSentence)
@@ -995,7 +1053,9 @@ class SharedPreferencesKanjiHistoryStore(
                         .put("spanishSentence", review.spanishSentence)
                         .put("selectedAnswer", review.selectedAnswer)
                         .put("correctAnswer", review.correctAnswer)
-                        .put("isCorrect", review.isCorrect),
+                        .put("isCorrect", review.isCorrect)
+                        .put("isUnrecoverable", review.isUnrecoverable)
+                        .put("correctAnswerIndex", review.correctAnswerIndex),
                 )
             }
         }
@@ -1123,6 +1183,10 @@ private class InMemoryKanjiHistoryStore : KanjiHistoryStore {
             .distinctBy { it.id }
             .sortedByDescending { it.completedAtMillis }
             .take(50)
+    }
+
+    override fun deleteEntry(entryId: String) {
+        historyEntries = historyEntries.filterNot { it.id == entryId }
     }
 }
 

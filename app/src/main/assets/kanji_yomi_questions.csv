@@ -13,7 +13,7 @@
 1,上,かみ,{川}[上]からももが{流}れてくる。,{かわ}[かみ]からももが{なが}れてくる。,Peach is flowing from upstream.,El melocotón fluye río arriba.
 1,上,じょう,{気球}が{空}から{地}[上]に{降}りてくる。,{ききゅう}が{そら}から{ち}[じょう]に{お}りてくる。,Balloons fall from the sky to the ground.,Los globos caen del cielo al suelo.
 1,上,のぼ,{電車}の[上]り{線}と{下}り{線}をまちがえる。,{でんしゃ}の[のぼ]り{せん}と{くだ}り{せん}をまちがえる。,Mistaking the up and down train lines.,Confundir las líneas de tren de subida y bajada.
-1,下,お,おじさんが{作業}を{済}ませて、キャタツから[下]りる。,おじさんが{さぎょう}を{す}ませて、キャタツから[お]りる。,The old man finishes his work and gets off the cat.,El anciano termina su trabajo y se baja del gato.
+1,下,お,おじさんが{作業}を{済}ませて、{脚立}から[下]りる。,おじさんが{さぎょう}を{す}ませて、{きゃたつ}から[お]りる。,The man finishes his work and climbs down from the stepladder.,El hombre termina el trabajo y baja de la escalera de tijera.
 1,下,か,{日曜日}に、{地}[下]{鉄}に{乗}って{出}かける。,{にちようび}に、{ち}[か]{てつ}に{の}って{で}かける。,"On Sunday, I go out on the subway.",El domingo salgo en metro.
 1,下,くだ,{山}を[下]っているとちゅうで、キツネに{会}った。,{やま}を[くだ]っているとちゅうで、キツネに{あ}った。,"As I was going down the mountain, I met a fox.","Mientras bajaba de la montaña, me encontré con un zorro."
 1,下,げ,トイレで{流}した{水}が、[下]{水道}に{流}れていく。,トイレで{なが}した{みず}が、[げ]{すいどう}に{なが}れていく。,Water flushed from the toilet flows into the sewer.,El agua que sale del inodoro desemboca en el alcantarillado.
@@ -70,9 +70,9 @@
 1,右,ゆう,{横断歩道}をわたる{前}に{左}[右]を{確認}する。,{おうだんほどう}をわたる{まえ}に{さ}[ゆう]を{かくにん}する。,Check left and right before crossing the crosswalk.,Verifique a la izquierda y a la derecha antes de cruzar el cruce de peatones.
 1,名,な,{新}しく{生}まれる{子}どもの[名]{前}になやむ。,{あたら}しく{う}まれる{こ}どもの[な]{まえ}になやむ。,I love the name of my new child.,Me encanta el nombre de mi nuevo hijo.
 1,名,みょう,この{物語}には{個性的}な[名]{字}の{登場人物}が{多}い。,この{ものがたり}には{こせいてき}な[みょう]{じ}の{とうじょうじんぶつ}が{おお}い。,This story has many characters with unique last names.,Esta historia tiene muchos personajes con apellidos únicos.
-1,名,めい,しょうぎの[名]{人}がコンピュータと{勝負}をする。,しょうぎの[めい]{じん}がコンピュータと{しょうぶ}をする。,A master swordsman competes against a computer.,Un maestro espadachín compite contra una computadora.
+1,名,めい,しょうぎの[名]{人}がコンピュータと{勝負}をする。,しょうぎの[めい]{じん}がコンピュータと{しょうぶ}をする。,A shogi master competes against a computer.,Un maestro de shogi compite contra una computadora.
 1,四,し,[四]{季}があるのは{日本}の{特}ちょうの{一}つだ。,[し]{き}があるのは{にっぽん}の{とく}ちょうの{ひと}つだ。,One of Japan's special features is that it has four seasons.,Una de las características especiales de Japón es que tiene cuatro estaciones.
-1,四,よ,{友達}[四]{人}でババぬきをする。,{ともだち}[よ]{にん}でババぬきをする。,Four of my friends are going to have a baba-nuki session.,Cuatro de mis amigos van a tener una sesión de baba-nuki.
+1,四,よ,{友達}[四]{人}でババぬきをする。,{ともだち}[よ]{にん}でババぬきをする。,Four friends play Old Maid.,Cuatro amigos juegan a Old Maid.
 1,四,よっ,{夏休}み[四]{日目}から{宿題}をやらなくなった。,{なつやす}み[よっ]{かめ}から{しゅくだい}をやらなくなった。,I stopped doing my homework from the fourth day of summer vacation.,Dejé de hacer los deberes desde el cuarto día de las vacaciones de verano.
 1,四,よん,[四]{連続}でじゃんけんに{負}ける。,[よん]{れんぞく}でじゃんけんに{ま}ける。,"Lose to rock, paper, scissors four times in a row.","Pierde contra piedra, papel y tijera cuatro veces seguidas."
 1,土,つち,[土]{遊}びでどろだらけになって{帰}ってくる。,[つち]{あそ}びでどろだらけになって{かえ}ってくる。,They come home covered in mud from playing in the dirt.,Regresan a casa cubiertos de barro por jugar en la tierra.
@@ -80,7 +80,7 @@
 1,土,ど,ここから{先}は[土]{足禁止}ですよ。,ここから{さき}は[ど]{そくきんし}ですよ。,No shoes are allowed from here on.,A partir de ahora no se permiten zapatos.
 1,夕,ゆう,きれいな[夕]{焼}けの{写真}をとる。,きれいな[ゆう]{や}けの{しゃしん}をとる。,Take pictures of beautiful sunsets.,Toma fotografías de hermosos atardeceres.
 1,大,おお,[大]{雨}でぬれて、かぜをひいてしまった。,[おお]{あめ}でぬれて、かぜをひいてしまった。,I got wet from the heavy rain and caught a cold.,Me mojé por la fuerte lluvia y me resfrié.
-1,大,おお,{一番}[大]きいサイズの{服}を{買}う。,{いちばん}[おお]きいサイズの{ふく}を{か}う。,Buy clothes in your largest size.,Compra ropa en tu talla más grande.
+1,大,おお,{一番}[大]きいサイズの{服}を{買}う。,{いちばん}[おお]きいサイズの{ふく}を{か}う。,Buy clothes in the largest size.,Compra ropa de la talla más grande.
 1,大,たい,このパズル、[大]して{難}しくなかったね。,このパズル、[たい]して{むずか}しくなかったね。,This puzzle wasn't very difficult.,Este rompecabezas no fue muy difícil.
 1,大,だい,{私}はキャンディーが[大]{好}きだ。,{わたくし}はキャンディーが[だい]{す}きだ。,I love candy.,Me encantan los dulces.
 1,天,あま,[天]の{川}をながめながらスイカを{食}べた。,[あま]の{がわ}をながめながらスイカを{た}べた。,I ate watermelon while looking at the Milky Way.,Comí sandía mientras miraba la Vía Láctea.
@@ -113,7 +113,7 @@
 1,日,か,くずれた{橋}が{七}[日]{間}で{元通}りになった。,くずれた{はし}が{なな}[か]{かん}で{もととお}りになった。,The collapsed bridge was restored in seven days.,El puente derrumbado fue restaurado en siete días.
 1,日,じつ,この{前}の{休}[日]は{友達}と{遊}びに{行}った。,この{まえ}の{きゅう}[じつ]は{ともだち}と{あそ}びに{い}った。,"Last holiday, I went out with my friends.",Las últimas vacaciones salí con mis amigos.
 1,日,にち,{集合}する[日]{時}と{場所}を{確認}する。,{しゅうごう}する[にち]{じ}と{ばしょ}を{かくにん}する。,"Confirm the date, time and location of the meeting.","Confirmar la fecha, hora y lugar de la reunión."
-1,日,ひ,はち{植}えを[日]{当}たりの{良}い{場所}に{移}す。,はち{う}えを[ひ]{あ}たりの{よ}い{ばしょ}に{うつ}す。,Move the bee plant to a sunny location.,Mueva la planta de abejas a un lugar soleado.
+1,日,ひ,{鉢植}えを[日]{当}たりの{良}い{場所}に{移}す。,{はちう}えを[ひ]{あ}たりの{よ}い{ばしょ}に{うつ}す。,Move the potted plant to a sunny spot.,Mueve la planta en maceta a un lugar soleado.
 1,早,そう,{急}に{具合}が{悪}くなって[早]{退}する。,{きゅう}に{ぐあい}が{わる}くなって[そう]{たい}する。,I suddenly become unwell and have to leave work early.,De repente me siento mal y tengo que salir temprano del trabajo.
 1,早,はや,{朝}[早]くから{野球}の{練習}をする。,{あさ}[はや]くから{やきゅう}の{れんしゅう}をする。,We practice baseball early in the morning.,Practicamos béisbol temprano en la mañana.
 1,月,がつ,お{正}[月]はだらだらして{過}ごした。,お{しょう}[がつ]はだらだらして{す}ごした。,I spent New Year's day lazing around.,Pasé el día de Año Nuevo holgazaneando.
@@ -142,12 +142,12 @@
 1,火,か,{料理}をするために、コンロを{点}[火]する。,{りょうり}をするために、コンロを{てん}[か]する。,Light the stove to cook.,Enciende la estufa para cocinar.
 1,火,ひ,アルコールランプに[火]をつける。,アルコールランプに[ひ]をつける。,Light an alcohol lamp.,Enciende una lámpara de alcohol.
 1,犬,いぬ,{飼}っている[犬]に{顔}をなめられる。,{か}っている[いぬ]に{かお}をなめられる。,My dog ​​licks my face.,Mi perro me lame la cara.
-1,犬,けん,かい{助}[犬]といっしょにレストランに{入}る。,かい{じょ}[けん]といっしょにレストランに{はい}る。,Enter the restaurant with your guide dog.,Entra al restaurante con tu perro guía.
+1,犬,けん,かい{助}[犬]といっしょにレストランに{入}る。,かい{じょ}[けん]といっしょにレストランに{はい}る。,Enter the restaurant with a service dog.,Entra al restaurante con un perro de asistencia.
 1,玉,ぎょく,{家宝}の{宝}[玉]をていねいにみがく。,{かほう}の{ほう}[ぎょく]をていねいにみがく。,Carefully polish your heirloom jewels.,Pule con cuidado tus joyas reliquia.
 1,玉,たま,スーパーで{水}[玉]{模様}のかさを{買}う。,スーパーで{みず}[たま]{もよう}のかさを{か}う。,Buy a polka dot umbrella at the supermarket.,Compra un paraguas de lunares en el supermercado.
 1,王,おう,{立派}なかんむりをかぶった[王]さまに{会}う。,{りっぱ}なかんむりをかぶった[おう]さまに{あ}う。,We meet a king wearing a magnificent crown.,Nos encontramos con un rey que lleva una magnífica corona.
 1,生,い,{私}の{祖父}はとても{長}[生]きです。,{わたし}の{そふ}はとても{なが}[い]きです。,My grandfather has lived a very long life.,Mi abuelo ha vivido una vida muy larga.
-1,生,う,{動物園}のパンダに{子}どもが[生]まれる。,{どうぶつえん}のパンダに{こ}どもが[う]まれる。,A baby is born to a panda at the zoo.,Un panda nace un bebé en el zoológico.
+1,生,う,{動物園}のパンダに{子}どもが[生]まれる。,{どうぶつえん}のパンダに{こ}どもが[う]まれる。,A baby is born to a panda at the zoo.,Nace una cría de panda en el zoológico.
 1,生,しょう,エジソンは{一}[生]のうちに{多}くの{発明}をした。,エジソンは{いっ}[しょう]のうちに{おお}くの{はつめい}をした。,Edison made many inventions during his lifetime.,Edison hizo muchos inventos durante su vida.
 1,生,せい,[生]{徒会長}の{選挙}でだれに{投票}しようかなやむ。,[せい]{とかいちょう}の{せんきょ}でだれに{とうひょう}しようかなやむ。,I can't decide who to vote for in the student council president election.,No puedo decidir por quién votar en la elección del presidente del consejo estudiantil.
 1,生,せい,{大学}[生]から{大学}での{過}ごし{方}を{聞}く。,{だいがく}[せい]から{だいがく}での{す}ごし{かた}を{き}く。,Hear from university students how they spent their time at university.,Escuche a estudiantes universitarios cómo pasaron su tiempo en la universidad.
@@ -160,11 +160,11 @@
 1,男,なん,ぼくは{三人兄弟}の{長}[男]だ。,ぼくは{さんにんきょうだい}の{ちょう}[なん]だ。,I am the eldest of three brothers.,Soy el mayor de tres hermanos.
 1,町,ちょう,[町]{内会}で{節分}の{行事}が{行}われる。,[ちょう]{ないかい}で{せつぶん}の{ぎょうじ}が{おこな}われる。,A Setsubun event is held at the neighborhood association.,Se lleva a cabo un evento Setsubun en la asociación de vecinos.
 1,町,まち,さすらいの{旅人}が{港}[町]に{立}ち{寄}る。,さすらいの{たびびと}が{みなと}[まち]に{た}ち{よ}る。,A wandering traveler stops at a port town.,Un viajero errante se detiene en una ciudad portuaria.
-1,白,しら,つまらないギャグで{場}が[白]ける。,つまらないギャグで{ば}が[しら]ける。,A boring gag lights up the atmosphere.,Un chiste aburrido ilumina el ambiente.
+1,白,しら,つまらないギャグで{場}が[白]ける。,つまらないギャグで{ば}が[しら]ける。,A boring joke kills the mood.,Un chiste aburrido arruina el ambiente.
 1,白,しろ,[白]い{歯}をむきだしにして{笑}う。,[しろ]い{は}をむきだしにして{わら}う。,"He smiles, exposing his white teeth.","Él sonríe, dejando al descubierto sus dientes blancos."
 1,白,はく,{平安時代}では、[白]{米}はごちそうだった。,{へいあんじだい}では、[はく]{まい}はごちそうだった。,"In the Heian period, white rice was a delicacy.","En el período Heian, el arroz blanco era un manjar."
-1,百,ひゃく,では、{教科書}の[百]{五}ページを{開}いてください。,では、{きょうかしょ}の[ひゃく]{ご}ページを{ひら}いてください。,"Now, please open your textbook to page 15.","Ahora, abra su libro de texto en la página 15."
-1,目,め,{朝食}の[目]{玉焼}きにソースをかける。,{ちょうしょく}の[め]{だまや}きにソースをかける。,Sprinkle sauce on fried eggs for breakfast.,Espolvoree salsa sobre los huevos fritos para el desayuno.
+1,百,ひゃく,では、{教科書}の[百]{五}ページを{開}いてください。,では、{きょうかしょ}の[ひゃく]{ご}ページを{ひら}いてください。,"Now, please open your textbook to page 105.","Ahora, abran el libro de texto en la página 105."
+1,目,め,{朝食}の[目]{玉焼}きにソースをかける。,{ちょうしょく}の[め]{だまや}きにソースをかける。,Pour sauce on a fried egg for breakfast.,Echa salsa sobre el huevo frito del desayuno.
 1,目,もく,[目]{標}に{向}かってつっ{走}る。,[もく]{ひょう}に{む}かってつっ{ぱし}る。,Run towards your goal.,Corre hacia tu objetivo.
 1,石,いし,{道}ばたできれいな[石]を{見}つけた。,{みち}ばたできれいな[いし]を{み}つけた。,I found a beautiful stone by the roadside.,Encontré una hermosa piedra al borde del camino.
 1,石,しゃく,{磁}[石]を{使}って{砂鉄}を{集}める。,{じ}[しゃく]を{つか}って{さてつ}を{あつ}める。,Collect iron sand using a magnet.,Recoge arena de hierro con un imán.
@@ -239,7 +239,7 @@
 2,冬,ふゆ,リスが[冬]に{備}えて{食}べ{物}を{集}めている。,リスが[ふゆ]に{そな}えて{た}べ{もの}を{あつ}めている。,A squirrel is gathering food for the winter.,Una ardilla está recogiendo comida para el invierno.
 2,刀,かたな,おもちゃの[刀]をふり{回}して{遊}ぶ。,おもちゃの[かたな]をふり{まわ}して{あそ}ぶ。,Play with a toy sword.,Juega con una espada de juguete.
 2,刀,とう,{武将}にほうびとして、{名}[刀]がおくられる。,{ぶしょう}にほうびとして、{めい}[とう]がおくられる。,A famous sword is given to a military commander as a reward.,"Como recompensa, se entrega una espada famosa a un comandante militar."
-2,分,ふん,バスが{五}[分]おくれてとうちゃくする。,バスが{ご}[ふん]おくれてとうちゃくする。,The bus was five minutes late and I was disappointed.,El autobús llegó cinco minutos tarde y me decepcioné.
+2,分,ふん,バスが{五}[分]おくれてとうちゃくする。,バスが{ご}[ふん]おくれてとうちゃくする。,The bus arrives five minutes late.,El autobús llega cinco minutos tarde.
 2,分,ぶ,[分]{厚}い{本}が{頭}に{落}ちて、たんこぶができる。,[ぶ]{あつ}い{ほん}が{あたま}に{お}ちて、たんこぶができる。,A thick book falls on my head and I get a bump.,Un libro grueso cae sobre mi cabeza y me doy un golpe.
 2,分,ぶん,おこる{前}に、おれの{言}い[分]を{聞}いてよ。,おこる{まえ}に、おれの{い}い[ぶん]を{き}いてよ。,"Before you get angry, listen to what I have to say.","Antes de que te enojes, escucha lo que tengo que decir."
 2,分,わ,{決着}がつかないから、この{勝負}は{引}き[分]けだ。,{けっちゃく}がつかないから、この{しょうぶ}は{ひ}き[わ]けだ。,This match is a draw because it cannot be decided.,Este partido es un empate porque no se puede decidir.
@@ -348,10 +348,10 @@
 2,戸,と,[戸]を{開}いて{部屋}に{入}る。,[と]を{ひら}いて{へや}に{はい}る。,Open the door and enter the room.,Abre la puerta y entra a la habitación.
 2,才,さい,{意外}なところで[才]{能}を{発揮}する。,{いがい}なところで[さい]{のう}を{はっき}する。,Show your talent in unexpected places.,Muestra tu talento en lugares inesperados.
 2,教,おし,{友達}に{宿題}の{答}えを[教]えてもらった。,{ともだち}に{しゅくだい}の{こた}えを[おし]えてもらった。,My friend told me the answer to my homework.,Mi amigo me dijo la respuesta a mi tarea.
-2,教,きょう,{水泳}[教]{室}でクロールのコツを{教}わる。,{すいえい}[きょう]{しつ}でクロールのコツを{おそ}わる。,Learn how to crawl at swimming class.,Aprende a gatear en la clase de natación.
+2,教,きょう,{水泳}[教]{室}でクロールのコツを{教}わる。,{すいえい}[きょう]{しつ}でクロールのコツを{おそ}わる。,Learn tips for the front crawl at swimming class.,Aprende consejos para nadar crol en la clase de natación.
 2,教,きょう,{先生}に{説}[教]されて{落}ちこむ。,{せんせい}に{せっ}[きょう]されて{お}ちこむ。,I feel depressed when my teacher lectures me.,Me siento deprimido cuando mi maestro me sermonea.
 2,数,かず,これまでに[数]{多}くの{勉強}をしてきた。,これまでに[かず]{おお}くの{べんきょう}をしてきた。,I have learned a lot so far.,He aprendido mucho hasta ahora.
-2,数,かぞ,プリントを[数]えまちがえて{足}りなくなる。,プリントを[かぞ]えまちがえて{た}りなくなる。,I miscounted the prints and ran out.,Conté mal las huellas y salí corriendo.
+2,数,かぞ,プリントを[数]えまちがえて{足}りなくなる。,プリントを[かぞ]えまちがえて{た}りなくなる。,I miscounted the handouts and did not have enough.,Conté mal las hojas impresas y no alcanzaron.
 2,数,すう,パスワードの[数]{字}を{入力}する。,パスワードの[すう]{じ}を{にゅうりょく}する。,Enter the password number.,Ingrese el número de contraseña.
 2,新,あたら,{父}に[新]しいくつを{買}ってもらう。,{ちち}に[あたら]しいくつを{か}ってもらう。,I asked my father to buy me new shoes.,Le pedí a mi padre que me comprara zapatos nuevos.
 2,新,あら,{気持}ちを[新]たにして{一学期}をむかえる。,{きも}ちを[あら]たにして{いちがっき}をむかえる。,I am heading into the first semester with a renewed sense of humor.,Me dirijo al primer semestre con un sentido del humor renovado.
@@ -442,7 +442,7 @@
 2,組,く,{冷蔵庫}の{仕}[組]みを{本}で{調}べる。,{れいぞうこ}の{し}[く]みを{ほん}で{しら}べる。,Find out how a refrigerator works in a book.,Descubra cómo funciona un frigorífico en un libro.
 2,組,くみ,クラスがえで{三}[組]になる。,クラスがえで{さん}[くみ]になる。,The class is divided into three groups.,La clase se divide en tres grupos.
 2,組,そ,{地域}の{自治会}が[組]{織}される。,{ちいき}の{じちかい}が[そ]{しき}される。,Local residents' associations are organized.,Se organizan asociaciones de residentes locales.
-2,絵,え,パレットを{洗}わないでいたら、[絵]の{具}がカチカチになっちゃった。,パレットを{あら}わないでいたら、[え]の{ぐ}がカチカチになっちゃった。,"When I didn't wash my palette, the paint became sticky.","Cuando no lavé mi paleta, la pintura se volvió pegajosa."
+2,絵,え,パレットを{洗}わないでいたら、[絵]の{具}がカチカチになっちゃった。,パレットを{あら}わないでいたら、[え]の{ぐ}がカチカチになっちゃった。,"When I did not wash the palette, the paint hardened.","Cuando no lavé la paleta, la pintura se endureció."
 2,線,せん,{電}[線]の{上}にカラスがとまっている。,{でん}[せん]の{うえ}にカラスがとまっている。,A crow is perched on the electric wire.,Un cuervo está posado sobre el cable eléctrico.
 2,羽,は,{公園}のハトがいっせいに[羽]ばたく。,{こうえん}のハトがいっせいに[は]ばたく。,The pigeons in the park flap their wings all at once.,Las palomas del parque baten sus alas todas a la vez.
 2,羽,はね,{空}からカラスの[羽]がひらひらと{落}ちてきた。,{そら}からカラスの[はね]がひらひらと{お}ちてきた。,Crow feathers fluttered down from the sky.,Plumas de cuervo revoloteaban desde el cielo.
@@ -796,7 +796,7 @@
 3,皮,ひ,かんそうしているせいで[皮]ふがガサガサする。,かんそうしているせいで[ひ]ふがガサガサする。,My skin feels rough because I'm having a good time.,Mi piel se siente áspera porque la estoy pasando bien.
 3,皿,さら,お[皿]に{料理}を{盛}り{付}ける。,お[さら]に{りょうり}を{も}り{つ}ける。,Arrange the food on a plate.,Coloca la comida en un plato.
 3,相,あい,[相]{手}の{話}をさえぎって{話}し{始}める。,[あい]{て}の{はなし}をさえぎって{はな}し{はじ}める。,Start talking by interrupting the other person.,Empiece a hablar interrumpiendo a la otra persona.
-3,相,そう,{百点}！？[相]{当}、{努力}したんだね。,{ひゃくてん}！？[そう]{とう}、{どりょく}したんだね。,Hundred points! ? It took a lot of effort.,¡Cien puntos! ? Requirió mucho esfuerzo.
+3,相,そう,{百点}！？[相]{当}、{努力}したんだね。,{ひゃくてん}！？[そう]{とう}、{どりょく}したんだね。,One hundred points!? You must have worked really hard.,¿Cien puntos? Debes de haberte esforzado mucho.
 3,県,けん,{青森}[県]のねぶた{祭}に{一度行}ってみたい。,{あおもり}[けん]のねぶた{まつり}に{いちどい}ってみたい。,I would like to go to the Nebuta Festival in Aomori Prefecture at least once.,Me gustaría ir al menos una vez al Festival Nebuta en la prefectura de Aomori.
 3,真,しん,みんなで{集}まって{写}[真]をとる。,みんなで{あつ}まって{しゃ}[しん]をとる。,Everyone gathers and takes pictures.,Todos se reúnen y toman fotografías.
 3,真,ま,{家}に{帰}って[真]っ{先}にトイレに{入}る。,{いえ}に{かえ}って[ま]っ{さき}にトイレに{はい}る。,"When I get home, the first thing I do is go to the bathroom.",Cuando llego a casa lo primero que hago es ir al baño.
@@ -821,7 +821,7 @@
 3,笛,ふえ,{音楽室}で[笛]の{練習}をする。,{おんがくしつ}で[ふえ]の{れんしゅう}をする。,Practice playing the flute in the music room.,Practica tocar la flauta en la sala de música.
 3,第,だい,{気}になっていた{本}の[第]{一巻}を{買}った。,{き}になっていた{ほん}の[だい]{いちかん}を{か}った。,I bought the first volume of the book I was interested in.,Compré el primer volumen del libro que me interesaba.
 3,筆,ひつ,{漢字}の[筆]{順}をまちがえる。,{かんじ}の[ひつ]{じゅん}をまちがえる。,Wrong stroke order of kanji.,Orden de trazos incorrecto de los kanji.
-3,筆,ふで,[筆]を{洗}い{忘}れてカチカチになってしまう。,[ふで]を{あら}い{わす}れてカチカチになってしまう。,I forgot to wash my brushes and they got sticky.,Olvidé lavar mis pinceles y se pusieron pegajosos.
+3,筆,ふで,[筆]を{洗}い{忘}れてカチカチになってしまう。,[ふで]を{あら}い{わす}れてカチカチになってしまう。,I forgot to wash the brushes and they hardened.,Olvidé lavar los pinceles y se endurecieron.
 3,等,とう,ケーキを{六}[等]{分}に{切}り{分}ける。,ケーキを{ろく}[とう]{ぶん}に{き}り{わ}ける。,Cut the cake into six equal parts.,Corta el bizcocho en seis partes iguales.
 3,等,ひと,{正方形}は{四辺}の{長}さが[等]しい。,{せいほうけい}は{しへん}の{なが}さが[ひと]しい。,A square has four sides of equal length.,Un cuadrado tiene cuatro lados de igual longitud.
 3,箱,はこ,{辞書}を[箱]の{中}にしまう。,{じしょ}を[はこ]の{なか}にしまう。,Put the dictionary in the box.,Pon el diccionario en la caja.
@@ -928,7 +928,7 @@
 4,不,ふ,{最近}は[不]{運}な{出来事}が{多}かった。,{さいきん}は[ふ]{うん}な{できごと}が{おお}かった。,There have been many unfortunate events recently.,Ha habido muchos acontecimientos desafortunados recientemente.
 4,不,ぶ,カエルはなんだか[不]{気味}で{苦手}なんだよね。,カエルはなんだか[ぶ]{きみ}で{にがて}なんだよね。,Frogs are kind of creepy and I don't like them.,Las ranas dan un poco de miedo y no me gustan.
 4,争,あらそ,{仲}の{悪}い{人}と{言}い[争]いになる。,{なか}の{わる}い{ひ}と{とい}い[あらそ]いになる。,You get into an argument with someone you don't get along with.,Te peleas con alguien con quien no te llevas bien.
-4,争,そう,プールの{時間}にクロールの{競}[争]をする。,プールの{じかん}にクロールの{きょう}[そう]をする。,Have a competitive crawl during pool time.,Haga un crol competitivo durante el tiempo en la piscina.
+4,争,そう,プールの{時間}にクロールの{競}[争]をする。,プールの{じかん}にクロールの{きょう}[そう]をする。,Have a front crawl race during pool time.,Hacen una carrera de crol durante la clase de piscina.
 4,井,い,おじいちゃんとおばあちゃんのいる{福}[井]{県}に{手紙}を{送}る。,おじいちゃんとおばあちゃんのいる{ふく}[い]{けん}に{てがみ}を{おく}る。,"Send a letter to Fukui Prefecture, where my grandpa and grandma are.","Envía una carta a la prefectura de Fukui, donde están mi abuelo y mi abuela."
 4,付,つ,{辞典}のいろんなページにふせんを[付]ける。,{じてん}のいろんなページにふせんを[つ]ける。,Attach sticky notes to various pages of the dictionary.,Adjunte notas adhesivas a varias páginas del diccionario.
 4,付,ふ,この{駅}[付]{近}には{銀行}やスーパーがあります。,この{えき}[ふ]{きん}には{ぎんこう}やスーパーがあります。,There are banks and supermarkets near this station.,Hay bancos y supermercados cerca de esta estación.
@@ -1362,7 +1362,7 @@
 5,接,せつ,アルバイトの{面}[接]を{受}ける。,アルバイトの{めん}[せつ]を{う}ける。,Have an interview for a part-time job.,Tener una entrevista para un trabajo a tiempo parcial.
 5,提,てい,その[提]{案}を{受}け{入}れることはできない。,その[てい]{あん}を{う}け{い}れることはできない。,I cannot accept that proposal.,No puedo aceptar esa propuesta.
 5,損,そん,セールのことを{知}らず、[損]してしまった。,セールのことを{し}らず、[そん]してしまった。,I didn't know about the sale and ended up losing money.,No sabía de la venta y terminé perdiendo dinero.
-5,支,ささ,たのまれてキャタツを[支]える。,たのまれてキャタツを[ささ]える。,Support the cat at your request.,Apoye al gato cuando lo solicite.
+5,支,ささ,たのまれて{脚立}を[支]える。,たのまれて{きゃたつ}を[ささ]える。,Support the stepladder after being asked.,Sostén la escalera de tijera cuando te lo pidan.
 5,支,し,ま{王}によって{世界}が[支]{配}される。,ま{おう}によって{せかい}が[し]{はい}される。,The world is ruled by a king.,El mundo está gobernado por un rey.
 5,政,せい,{国民}の{声}を[政]{府}に{伝}える。,{こくみん}の{こえ}を[せい]{ふ}に{つた}える。,convey the voice of the people to the government.,Transmitir la voz del pueblo al gobierno.
 5,故,こ,パソコンが[故]{障}したので{修理}してもらった。,パソコンが[こ]{しょう}したので{しゅうり}してもらった。,"My computer broke down, so I had it repaired.","Mi computadora se averió, así que la hice reparar."
@@ -1434,12 +1434,12 @@
 5,祖,そ,[祖]{父}あてにメールを{送}る。,[そ]{ふ}あてにメールを{おく}る。,Send an email to your grandfather.,Envía un correo electrónico a tu abuelo.
 5,禁,きん,ゲームのやりすぎで{母}に[禁]{止}されてしまった。,ゲームのやりすぎで{はは}に[きん]{し}されてしまった。,My mother banned me because I played too many games.,Mi madre me prohibió porque jugaba demasiados juegos.
 5,移,い,{教室}から{理科室}へ[移]{動}する。,{きょうしつ}から{りかしつ}へ[い]{どう}する。,Move from the classroom to the science room.,Pasar del aula al salón de ciencias.
-5,移,うつ,アサガオの{植木}ばちを、げん{関前}から{庭}に[移]す。,アサガオの{うえき}ばちを、げん{せきぜん}から{にわ}に[うつ]す。,Move the morning glory plant from the front of the garden to the garden.,Mueva la planta de campanilla del frente del jardín al jardín.
+5,移,うつ,アサガオの{植木}ばちを、{玄関前}から{庭}に[移]す。,アサガオの{うえき}ばちを、{げんかんまえ}から{にわ}に[うつ]す。,Move the morning glory planter from the front entrance to the garden.,Mueve la maceta de campanilla desde la entrada hasta el jardín.
 5,程,てい,かれの{演奏}は{音}[程]がずれまくっている。,かれの{えんそう}は{おん}[てい]がずれまくっている。,His playing is out of tune.,Su forma de tocar está desafinada.
 5,税,ぜい,{国民}は{国}に{対}して{納}[税]する{義務}がある。,{こくみん}は{くに}に{たい}して{のう}[ぜい]する{ぎむ}がある。,Citizens have an obligation to pay taxes to the country.,Los ciudadanos tienen la obligación de pagar impuestos al país.
 5,築,きず,{相手}と{強}い{信}らい{関係}を[築]く。,{あいて}と{つよ}い{しん}らい{かんけい}を[きず]く。,Build strong trusting relationships with others.,Construir relaciones sólidas de confianza con los demás.
 5,築,ちく,{古}くなった{家}を{改}[築]する。,{ふる}くなった{いえ}を{かい}[ちく]する。,Renovate an old house.,Renovar una casa antigua.
-5,粉,こ,おもちには{何}をつけるのが{好}き？{私}はきな[粉]。,おもちには{なん}をつけるのが{す}き？{わたし}はきな[こ]。,What do you like to put on rice cakes? I am soybean flour.,¿Qué te gusta ponerle a las tortitas de arroz? Soy harina de soja.
+5,粉,こ,おもちには{何}をつけるのが{好}き？{私}はきな[粉]。,おもちには{なん}をつけるのが{す}き？{わたし}はきな[こ]。,What do you like to put on rice cakes? I like roasted soybean flour.,¿Qué te gusta ponerle a los mochi? A mí me gusta la harina de soja tostada.
 5,粉,こな,[粉]{薬}を{飲}もうとしてせきこんでしまう。,[こな]{ぐすり}を{の}もうとしてせきこんでしまう。,I end up coughing while trying to swallow the powder.,Termino tosiendo mientras intento tragar el polvo.
 5,粉,ふん,{花}[粉]しょうでくしゃみが{止}まらなくなる。,{か}[ふん]しょうでくしゃみが{と}まらなくなる。,I can't stop sneezing because of pollen.,No puedo dejar de estornudar por el polen.
 5,精,せい,[精]{密機械}の{組}み{立}てをロボットに{任}せる。,[せい]{みつきかい}の{く}み{た}てをロボットに{まか}せる。,Entrusting the assembly of precision machinery to robots.,Confiar el montaje de maquinaria de precisión a robots.
@@ -1541,7 +1541,7 @@
 6,乳,にゅう,この{農場}では[乳]{牛}が{飼育}されている。,この{のうじょう}では[にゅう]{ぎゅう}が{しいく}されている。,Dairy cows are raised on this farm.,En esta finca se crían vacas lecheras.
 6,亡,ぼう,{医者}によって{死}[亡]が{確認}される。,{いしゃ}によって{し}[ぼう]が{かくにん}される。,Death is confirmed by a doctor.,La muerte es confirmada por un médico.
 6,仁,じん,[仁]{義}を{大切}にし、{恩}は{必}ず{返}す。,[じん]{ぎ}を{たいせつ}にし、{おん}は{かなら}ず{かえ}す。,Value humanity and be sure to return the favor.,Valora la humanidad y asegúrate de devolver el favor.
-6,供,きょう,デパートで、けしょう{品}の{試}[供]{品}をもらった。,デパートで、けしょう{ひん}の{し}[きょう]{ひん}をもらった。,I received a free sample of a cheap product at a department store.,Recibí una muestra gratis de un producto barato en unos grandes almacenes.
+6,供,きょう,デパートで、けしょう{品}の{試}[供]{品}をもらった。,デパートで、けしょう{ひん}の{し}[きょう]{ひん}をもらった。,I received a free cosmetics sample at a department store.,Recibí una muestra gratis de cosméticos en unos grandes almacenes.
 6,供,そな,お{墓}の[供]え{物}をぬすんだらばちが{当}たるよ。,お{はか}の[そな]え{もの}をぬすんだらばちが{あ}たるよ。,"If you steal the offerings from the grave, you'll win a drumstick.","Si robas las ofrendas de la tumba, ganarás una baqueta."
 6,供,とも,ももたろうのお[供]には、ネコはいない。,ももたろうのお[とも]には、ネコはいない。,Momotaro doesn't have a cat with him.,Momotaro no tiene un gato con él.
 6,俵,たわら,{昔}、[俵]は{米}や{塩}などの{入}れ{物}に{使}われた。,{むかし}、[たわら]は{べい}や{しお}などの{い}れ{もの}に{つか}われた。,"In the old days, straw bales were used to store rice, salt, etc.","Antiguamente se utilizaban fardos de paja para almacenar arroz, sal, etc."
@@ -1551,7 +1551,7 @@
 6,傷,きず,{転}んでできた[傷]に{消毒液}をかける。,{ころ}んでできた[きず]に{しょうどくえき}をかける。,Apply disinfectant to the wound caused by the fall.,Aplicar desinfectante en la herida provocada por la caída.
 6,傷,しょう,{自転車}にぶつかって{軽}[傷]をおう。,{じてんしゃ}にぶつかって{けい}[しょう]をおう。,I was hit by a bicycle and suffered a minor injury.,Me atropelló una bicicleta y sufrí una herida leve.
 6,優,ゆう,おじいさんが{電車}の[優]{先席}にすわる。,おじいさんが{でんしゃ}の[ゆう]{せんせき}にすわる。,An old man sits in the priority seat on the train.,Un anciano se sienta en el asiento prioritario del tren.
-6,党,とう,{悪}[党]のアジトにせんにゅうする。,{あく}[とう]のアジトにせんにゅうする。,Call the villain's hideout.,Llama al escondite del villano.
+6,党,とう,{悪}[党]のアジトにせんにゅうする。,{あく}[とう]のアジトにせんにゅうする。,Sneak into the villains' hideout.,Infiltrarse en el escondite de los villanos.
 6,冊,さつ,{図書室}で{本}を{二}[冊]{借}りる。,{としょしつ}で{ほん}を{に}[さつ]{か}りる。,Borrow two books from the library.,Pide prestados dos libros de la biblioteca.
 6,処,しょ,[処]{方}せんを{持}って{薬局}に{行}く。,[しょ]{ほう}せんを{も}って{やっきょく}に{い}く。,Go to the pharmacy with your prescription.,Acude a la farmacia con tu receta.
 6,刻,きざ,{目覚}まし{時計}が{数分}[刻]みで{鳴}るよう{設定}する。,{めざ}まし{どけい}が{かずふん}[きざ]みで{な}るよう{せってい}する。,Set your alarm clock to go off every few minutes.,Configure su despertador para que suene cada pocos minutos.
@@ -1594,7 +1594,7 @@
 6,宇,う,ある{日}、いきなり[宇]{宙人}がやってきた。,ある{ひ}、いきなり[う]{ちゅうにん}がやってきた。,"One day, an alien suddenly came.","Un día, de repente llegó un extraterrestre."
 6,宗,しゅう,ぼくはどの[宗]{教}にも{入}っていない。,ぼくはどの[しゅう]{きょう}にも{はい}っていない。,I'm not a member of any religion.,No soy miembro de ninguna religión.
 6,宙,ちゅう,{宇}[宙]{人}からメッセージが{届}いた。,{う}[ちゅう]{にん}からメッセージが{とど}いた。,I received a message from an alien.,Recibí un mensaje de un extraterrestre.
-6,宝,たから,{海}ぞくが{残}したなぞを{解}いて[宝]を{探}す。,{かい}ぞくが{のこ}したなぞを{と}いて[たから]を{さが}す。,Find the treasure by solving the riddles left behind by the ocean.,Encuentra el tesoro resolviendo los acertijos que deja el océano.
+6,宝,たから,{海}ぞくが{残}したなぞを{解}いて[宝]を{探}す。,{かい}ぞくが{のこ}したなぞを{と}いて[たから]を{さが}す。,Find the treasure by solving the riddles left by the pirates.,Encuentra el tesoro resolviendo los acertijos que dejaron los piratas.
 6,宝,ほう,{奈良県}にある{東大寺}は{国}[宝]に{指定}されている。,{ならけん}にある{とうだいじ}は{こく}[ほう]に{してい}されている。,Todaiji Temple in Nara Prefecture is designated as a national treasure.,El templo Todaiji en la prefectura de Nara está designado tesoro nacional.
 6,宣,せん,テレビで{商品}を[宣]{伝}する。,テレビで{しょうひん}を[せん]{でん}する。,Advertise your products on TV.,Anuncie sus productos en la televisión.
 6,密,みつ,{秘}[密]のレシピで{究極}のカレーを{作}る。,{ひ}[みつ]のレシピで{きゅうきょく}のカレーを{つく}る。,Make the ultimate curry with a secret recipe.,Prepara el curry definitivo con una receta secreta.
@@ -1611,7 +1611,7 @@
 6,展,てん,[展]{覧会}に{自分}の{絵}を{出展}する。,[てん]{らんかい}に{じぶん}の{え}を{しゅってん}する。,Exhibit your own paintings at an exhibition.,Exponga sus propias pinturas en una exposición.
 6,層,そう,このビルは{階}[層]ごとにちがう{店}が{入}っている。,このビルは{かい}[そう]ごとにちがう{みせ}が{はい}っている。,This building has different shops on each floor.,Este edificio cuenta con diferentes comercios en cada planta.
 6,己,こ,{自}[己]{分}せきをして{長所}と{短所}を{整理}する。,{じ}[こ]{ぶん}せきをして{ちょうしょ}と{たんしょ}を{せいり}する。,Take stock of yourself and sort out your strengths and weaknesses.,Haz un balance de ti mismo y ordena tus fortalezas y debilidades.
-6,巻,かん,{映画}を{見}た。{圧}[巻]のはく{力}だったよ。,{えいが}を{み}た。{あっ}[かん]のはく{りょく}だったよ。,I saw a movie. It was an amazing effort.,Vi una película. Fue un esfuerzo asombroso.
+6,巻,かん,{映画}を{見}た。{圧}[巻]のはく{力}だったよ。,{えいが}を{み}た。{あっ}[かん]のはく{りょく}だったよ。,I saw a movie. Its impact was overwhelming.,Vi una película. Su fuerza era impresionante.
 6,巻,ま,にん{者}に{大切}な[巻]き{物}をぬすまれた。,にん{じゃ}に{たいせつ}な[ま]き{もの}をぬすまれた。,An important scroll was stolen by a ninja.,Un ninja robó un pergamino importante.
 6,巻,まき,{赤}[巻]{紙}・{青巻紙}・{黄巻紙}！,{あか}[まき]{がみ}・{あおまきがみ}・{きまきがみ}！,"Red rolling paper, blue rolling paper, yellow rolling paper!","¡Papel de fumar rojo, papel de fumar azul, papel de fumar amarillo!"
 6,幕,ばく,{新選組}が{活}やくしたのは[幕]{末}のころだ。,{しんせんぐみ}が{かつ}やくしたのは[ばく]{まつ}のころだ。,The Shinsengumi became active at the end of the Edo period.,El Shinsengumi entró en actividad al final del período Edo.
@@ -1717,7 +1717,7 @@
 6,紅,べに,{焼}きそばに[紅]しょうがをのせて{食}べる。,{や}きそばに[べに]しょうがをのせて{た}べる。,Eat fried noodles with pickled ginger.,Come fideos fritos con jengibre encurtido.
 6,納,おさ,{国}に{税金}を[納]める。,{くに}に{ぜいきん}を[おさ]める。,pay taxes to the country.,pagar impuestos al país.
 6,納,のう,{注文}された{品物}を[納]{品}する。,{ちゅうもん}された{しなもの}を[のう]{ひん}する。,Deliver ordered items.,Entregar artículos pedidos.
-6,純,じゅん,おにごっこのルールは{単}[純]だ。,おにごっこのルールは{たん}[じゅん]だ。,The rules of pretend play are simple.,Las reglas del juego imaginario son simples.
+6,純,じゅん,おにごっこのルールは{単}[純]だ。,おにごっこのルールは{たん}[じゅん]だ。,The rules of tag are simple.,Las reglas del juego de la mancha son simples.
 6,絹,きぬ,[絹]の{糸}で{編}んだスカーフを{首}に{巻}く。,[きぬ]の{いと}で{あ}んだスカーフを{くび}に{ま}く。,Wrap a scarf knitted from silk thread around your neck.,Envuelva una bufanda tejida con hilo de seda alrededor de su cuello.
 6,縦,じゅう,{電車}を{操}[縦]して{駅}に{止}める。,{でんしゃ}を{そう}[じゅう]して{えき}に{と}める。,Control the train and stop it at the station.,Controla el tren y detenlo en la estación.
 6,縦,たて,{背}の{順}で[縦]{一列}に{並}んですわる。,{せ}の{じゅん}で[たて]{かずなみ}に{なら}んですわる。,Sit in a vertical line in order of height.,Siéntese en línea vertical en orden de altura.

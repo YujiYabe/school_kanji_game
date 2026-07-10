@@ -24,6 +24,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -34,11 +35,14 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -106,6 +110,7 @@ fun KanjiScreen(
                 historyEntries = uiState.historyEntries,
                 onBack = viewModel::hideHistory,
                 onOpenDetail = viewModel::showHistoryDetail,
+                onDeleteHistory = viewModel::deleteHistoryEntry,
                 modifier = Modifier.padding(paddingValues),
             )
 
@@ -247,8 +252,38 @@ private fun HistoryScreen(
     historyEntries: List<KanjiHistoryEntry>,
     onBack: () -> Unit,
     onOpenDetail: (String) -> Unit,
+    onDeleteHistory: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    var deleteTarget by remember { mutableStateOf<KanjiHistoryEntry?>(null) }
+
+    deleteTarget?.let { entry ->
+        AlertDialog(
+            onDismissRequest = { deleteTarget = null },
+            title = {
+                Text(text = "履歴を削除しますか？")
+            },
+            text = {
+                Text(text = entry.completedAtMillis.formatHistoryDateTime())
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        onDeleteHistory(entry.id)
+                        deleteTarget = null
+                    },
+                ) {
+                    Text(text = "OK")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { deleteTarget = null }) {
+                    Text(text = "キャンセル")
+                }
+            },
+        )
+    }
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -299,9 +334,11 @@ private fun HistoryScreen(
                     count = historyEntries.size,
                     key = { index -> historyEntries[index].id },
                 ) { index ->
+                    val entry = historyEntries[index]
                     HistoryRow(
-                        entry = historyEntries[index],
+                        entry = entry,
                         onOpenDetail = onOpenDetail,
+                        onDelete = { deleteTarget = entry },
                     )
                 }
             }
@@ -313,6 +350,7 @@ private fun HistoryScreen(
 private fun HistoryRow(
     entry: KanjiHistoryEntry,
     onOpenDetail: (String) -> Unit,
+    onDelete: () -> Unit,
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -349,6 +387,12 @@ private fun HistoryRow(
                 shape = RoundedCornerShape(8.dp),
             ) {
                 Text(text = "詳細", fontWeight = FontWeight.Bold)
+            }
+            OutlinedButton(
+                onClick = onDelete,
+                shape = RoundedCornerShape(8.dp),
+            ) {
+                Text(text = "削除", fontWeight = FontWeight.Bold)
             }
         }
     }
@@ -578,6 +622,7 @@ private fun ReadingQuizScreen(
             markedSentenceReading = question.markedSentenceReading,
             targetText = question.targetText,
             targetReading = question.readingAnswers.firstOrNull().orEmpty(),
+            showTargetRuby = false,
             modifier = Modifier.fillMaxWidth(),
         )
         TranslationSentences(
@@ -822,6 +867,7 @@ private fun RetryResultScreen(
 ) {
     val wrongReviews = uiState.readingReviews
         .filterNot { it.isCorrect }
+    val retryableWrongCount = wrongReviews.count { !it.isUnrecoverable }
 
     Column(
         modifier = modifier
@@ -838,7 +884,7 @@ private fun RetryResultScreen(
         )
 
         Text(
-            text = "間違った問題 ${wrongReviews.size}問",
+            text = "リトライ対象 ${retryableWrongCount}問",
             fontSize = 40.sp,
             lineHeight = 46.sp,
             fontWeight = FontWeight.Black,
@@ -848,6 +894,7 @@ private fun RetryResultScreen(
         KanjiReviewList(
             uiState = uiState,
             showCorrectAnswer = false,
+            showTargetRuby = false,
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth(),
@@ -870,6 +917,7 @@ private fun KanjiReviewList(
     uiState: KanjiUiState,
     showCorrectAnswer: Boolean,
     showReadingReviews: Boolean = true,
+    showTargetRuby: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     Surface(
@@ -906,6 +954,7 @@ private fun KanjiReviewList(
                     ReadingReviewRow(
                         review = reviews[index],
                         showCorrectAnswer = showCorrectAnswer,
+                        showTargetRuby = showTargetRuby,
                     )
                 }
             }
@@ -961,10 +1010,11 @@ private fun ReviewSectionHeader(text: String) {
 private fun ReadingReviewRow(
     review: KanjiAnswerReview,
     showCorrectAnswer: Boolean,
+    showTargetRuby: Boolean = true,
 ) {
     val textColor = if (review.isCorrect) Color.Black else Color(0xFFD00000)
     val selectedText = review.selectedAnswer ?: "未回答"
-    val answerText = if (showCorrectAnswer) {
+    val answerText = if (showCorrectAnswer || review.isUnrecoverable) {
         "選択: $selectedText   正解: ${review.correctAnswer}"
     } else {
         "選択: $selectedText"
@@ -983,7 +1033,11 @@ private fun ReadingReviewRow(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text(
-                text = "${review.questionNumber}問目",
+                text = buildString {
+                    append("${review.questionNumber}問目")
+                    if (review.attemptNumber > 1) append(" / ${review.attemptNumber}回目")
+                    if (review.isUnrecoverable) append(" / 回収不能")
+                },
                 color = if (review.isCorrect) Color(0xFF666666) else Color(0xFFD00000),
                 fontWeight = FontWeight.Bold,
                 fontSize = 13.sp,
@@ -997,6 +1051,7 @@ private fun ReadingReviewRow(
                 targetReading = review.targetReading,
                 textColor = textColor,
                 textSize = 27.sp,
+                showTargetRuby = showTargetRuby,
                 modifier = Modifier.weight(1f),
             )
         }
@@ -1297,8 +1352,17 @@ private fun RubySentence(
     textColor: Color = Color.Unspecified,
     targetColor: Color = Color(0xFF2563EB),
     textSize: TextUnit = 36.sp,
+    showTargetRuby: Boolean = true,
 ) {
-    val tokens = remember(sentence, sentenceReading, markedSentence, markedSentenceReading, targetText, targetReading) {
+    val tokens = remember(
+        sentence,
+        sentenceReading,
+        markedSentence,
+        markedSentenceReading,
+        targetText,
+        targetReading,
+        showTargetRuby,
+    ) {
         rubyTokens(
             sentence = sentence,
             sentenceReading = sentenceReading,
@@ -1306,6 +1370,7 @@ private fun RubySentence(
             markedSentenceReading = markedSentenceReading,
             targetText = targetText,
             targetReading = targetReading,
+            showTargetRuby = showTargetRuby,
         )
     }
 
@@ -1368,6 +1433,7 @@ private fun rubyTokens(
     markedSentenceReading: String,
     targetText: String,
     targetReading: String,
+    showTargetRuby: Boolean,
 ): List<RubyToken> {
     if (sentence.isBlank()) return emptyList()
     explicitRubyTokens(
@@ -1375,6 +1441,7 @@ private fun rubyTokens(
         markedSentenceReading = markedSentenceReading,
         targetText = targetText,
         targetReading = targetReading,
+        showTargetRuby = showTargetRuby,
     )
         ?.let { return it.mergePlainNeighbors() }
     if (sentenceReading.isBlank()) return targetOnlyTokens(sentence, targetText)
@@ -1423,6 +1490,7 @@ private fun rubyTokens(
                 targetOffset = targetStart - runStart,
                 targetText = targetText,
                 targetReading = targetReading,
+                showTargetRuby = showTargetRuby,
             )
         } else {
             tokens.add(RubyToken(text = runText, ruby = runReading))
@@ -1442,6 +1510,7 @@ private fun explicitRubyTokens(
     markedSentenceReading: String,
     targetText: String,
     targetReading: String,
+    showTargetRuby: Boolean,
 ): List<RubyToken>? {
     if (!markedSentence.hasRubyMarkers() || !markedSentenceReading.hasRubyMarkers()) return null
 
@@ -1460,7 +1529,9 @@ private fun explicitRubyTokens(
                     add(
                         RubyToken(
                             text = sentenceSegment.text,
-                            ruby = targetReading.takeIf { sentenceSegment.text == targetText }.orEmpty(),
+                            ruby = targetReading
+                                .takeIf { showTargetRuby && sentenceSegment.text == targetText }
+                                .orEmpty(),
                             isTarget = true,
                         ),
                     )
@@ -1529,6 +1600,7 @@ private fun MutableList<RubyToken>.addTargetRunTokens(
     targetOffset: Int,
     targetText: String,
     targetReading: String,
+    showTargetRuby: Boolean,
 ) {
     val prefixText = runText.take(targetOffset)
     val suffixText = runText.drop(targetOffset + targetText.length)
@@ -1536,7 +1608,7 @@ private fun MutableList<RubyToken>.addTargetRunTokens(
 
     if (targetReadingStart < 0) {
         if (prefixText.isNotEmpty()) add(RubyToken(prefixText, runReading))
-        add(RubyToken(targetText, ruby = targetReading, isTarget = true))
+        add(RubyToken(targetText, ruby = targetReading.takeIf { showTargetRuby }.orEmpty(), isTarget = true))
         if (suffixText.isNotEmpty()) add(RubyToken(suffixText))
         return
     }
@@ -1548,7 +1620,7 @@ private fun MutableList<RubyToken>.addTargetRunTokens(
     if (prefixText.isNotEmpty()) {
         add(RubyToken(prefixText, prefixReading))
     }
-    add(RubyToken(targetText, ruby = targetReading, isTarget = true))
+    add(RubyToken(targetText, ruby = targetReading.takeIf { showTargetRuby }.orEmpty(), isTarget = true))
     if (suffixText.isNotEmpty()) {
         add(RubyToken(suffixText, suffixReading))
     }
