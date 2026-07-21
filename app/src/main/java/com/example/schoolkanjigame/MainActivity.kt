@@ -13,12 +13,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.schoolkanjigame.kanji.FileBackedKanjiSettingsStore
 import com.example.schoolkanjigame.kanji.KanjiScreen
 import com.example.schoolkanjigame.kanji.KanjiViewModel
 import com.example.schoolkanjigame.kanji.SharedPreferencesKanjiHistoryStore
 import com.example.schoolkanjigame.kanji.SharedPreferencesKanjiSettingsStore
 import com.example.schoolkanjigame.kanji.SharedPreferencesQuestionAttemptStore
 import com.example.schoolkanjigame.kanji.loadKanjiQuestionsFromCsv
+import java.io.File
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -47,11 +49,14 @@ private fun SchoolKanjiGameApp() {
                 )
             }
             val settingsStore = remember(context) {
-                SharedPreferencesKanjiSettingsStore(
-                    context.applicationContext.getSharedPreferences(
-                        "kanji_settings",
-                        Context.MODE_PRIVATE,
+                FileBackedKanjiSettingsStore(
+                    delegate = SharedPreferencesKanjiSettingsStore(
+                        context.applicationContext.getSharedPreferences(
+                            "kanji_settings",
+                            Context.MODE_PRIVATE,
+                        ),
                     ),
+                    settingsFile = File(context.applicationContext.filesDir, "kanji_settings.json"),
                 )
             }
             val historyStore = remember(context) {

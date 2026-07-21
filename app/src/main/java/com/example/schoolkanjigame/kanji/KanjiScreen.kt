@@ -8,9 +8,11 @@ import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
 import android.net.wifi.WifiNetworkSpecifier
+import android.net.wifi.WifiManager
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.compose.BackHandler
@@ -52,6 +54,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -88,6 +91,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -145,6 +149,7 @@ fun KanjiScreen(
             uiState.isParentAdminVisible -> ParentAdminScreen(
                 uiState = uiState,
                 onGradeEnabledChanged = viewModel::setGradeEnabled,
+                onYoutubeInAppEnabledChanged = viewModel::setYoutubeInAppEnabled,
                 onYoutubeMinutesPer100CorrectChanged = viewModel::setYoutubeMinutesPer100Correct,
                 onSaveYoutubeWifiSettings = viewModel::saveYoutubeWifiSettings,
                 onUnlock = viewModel::unlockParentAdmin,
@@ -156,6 +161,7 @@ fun KanjiScreen(
             uiState.isYoutubeRewardVisible -> YoutubeRewardScreen(
                 uiState = uiState,
                 onBack = viewModel::hideYoutubeReward,
+                onChargeableChanged = viewModel::setYoutubeRewardChargeable,
                 modifier = Modifier.padding(paddingValues),
             )
 
@@ -238,7 +244,7 @@ private fun StartSettingsScreen(
                 verticalArrangement = Arrangement.spacedBy(22.dp),
             ) {
                 Text(
-                    text = "漢字ゲーム",
+                    text = "漢字アプリ",
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Black,
                     color = Color(0xFF16408F),
@@ -297,7 +303,7 @@ private fun StartSettingsScreen(
 
                 Button(
                     onClick = onYoutubeReward,
-                    enabled = uiState.youtubeRewardAvailableSeconds > 0,
+                    enabled = uiState.isYoutubeInAppEnabled && uiState.youtubeRewardAvailableSeconds > 0,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(58.dp),
@@ -308,7 +314,11 @@ private fun StartSettingsScreen(
                     ),
                 ) {
                     Text(
-                        text = "YouTube ${uiState.youtubeRewardAvailableSeconds.formatRewardTimeText()}",
+                        text = if (uiState.isYoutubeInAppEnabled) {
+                            "YouTube ${uiState.youtubeRewardAvailableSeconds.formatRewardTimeText()}"
+                        } else {
+                            "YouTube 無効"
+                        },
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Black,
                     )
@@ -332,6 +342,7 @@ private fun StartSettingsScreen(
 private fun ParentAdminScreen(
     uiState: KanjiUiState,
     onGradeEnabledChanged: (Int, Boolean) -> Unit,
+    onYoutubeInAppEnabledChanged: (Boolean) -> Unit,
     onYoutubeMinutesPer100CorrectChanged: (Int) -> Unit,
     onSaveYoutubeWifiSettings: (String, String) -> Unit,
     onUnlock: (String) -> Unit,
@@ -344,9 +355,101 @@ private fun ParentAdminScreen(
     var newPassword by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
     var localPasswordError by remember { mutableStateOf<String?>(null) }
-    var youtubeWifiSsid by remember(uiState.youtubeWifiSsid) { mutableStateOf(uiState.youtubeWifiSsid) }
+    val context = LocalContext.current
+    var hasWifiPermission by remember {
+        mutableStateOf(context.hasFineLocationPermission())
+    }
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        hasWifiPermission = granted
+    }
+    val connectedWifiSsid = remember(hasWifiPermission) {
+        if (hasWifiPermission) context.currentWifiSsid().orEmpty() else ""
+    }
+    var youtubeWifiSsid by remember(uiState.youtubeWifiSsid, connectedWifiSsid) {
+        mutableStateOf(uiState.youtubeWifiSsid.ifBlank { connectedWifiSsid })
+    }
     var youtubeWifiPassword by remember(uiState.youtubeWifiPassword) {
         mutableStateOf(uiState.youtubeWifiPassword)
+    }
+    var wifiSsidOptions by remember { mutableStateOf(emptyList<String>()) }
+    var showWifiSsidDialog by remember { mutableStateOf(false) }
+    var wifiSettingsMessage by remember { mutableStateOf<String?>(null) }
+    var wifiPasswordConfirmed by remember { mutableStateOf(false) }
+    var wifiTestTarget by remember { mutableStateOf<Pair<String, String>?>(null) }
+
+    LaunchedEffect(hasWifiPermission) {
+        if (!hasWifiPermission) {
+            permissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+        }
+    }
+
+    wifiTestTarget?.let { target ->
+        DisposableEffect(target) {
+            wifiSettingsMessage = "接続確認中: ${target.first}"
+            val cancel = requestYoutubeWifiConnection(
+                context = context,
+                ssid = target.first,
+                password = target.second,
+                onStatus = { message ->
+                    wifiSettingsMessage = message
+                    wifiPasswordConfirmed = false
+                    wifiTestTarget = null
+                },
+                onConnected = { message ->
+                    wifiSettingsMessage = message
+                    wifiPasswordConfirmed = true
+                    wifiTestTarget = null
+                },
+            )
+            onDispose { cancel() }
+        }
+    }
+
+    if (showWifiSsidDialog) {
+        AlertDialog(
+            onDismissRequest = { showWifiSsidDialog = false },
+            title = { Text(text = "SSIDを選択") },
+            text = {
+                LazyColumn(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    if (wifiSsidOptions.isEmpty()) {
+                        item {
+                            Text(text = "SSIDが見つかりませんでした。")
+                        }
+                    } else {
+                        items(
+                            count = wifiSsidOptions.size,
+                            key = { index -> wifiSsidOptions[index] },
+                        ) { index ->
+                            OutlinedButton(
+                                onClick = {
+                                    youtubeWifiSsid = wifiSsidOptions[index]
+                                    wifiPasswordConfirmed = false
+                                    showWifiSsidDialog = false
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(8.dp),
+                            ) {
+                                Text(
+                                    text = wifiSsidOptions[index],
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showWifiSsidDialog = false }) {
+                    Text(text = "閉じる")
+                }
+            },
+        )
     }
 
     LazyColumn(
@@ -439,6 +542,29 @@ private fun ParentAdminScreen(
                         onGradeEnabledChanged = onGradeEnabledChanged,
                     )
 
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "アプリ内YouTube",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Black,
+                            )
+                            Text(
+                                text = if (uiState.isYoutubeInAppEnabled) "有効" else "無効",
+                                color = MaterialTheme.colorScheme.secondary,
+                                fontWeight = FontWeight.Bold,
+                            )
+                        }
+                        Switch(
+                            checked = uiState.isYoutubeInAppEnabled,
+                            onCheckedChange = onYoutubeInAppEnabledChanged,
+                        )
+                    }
+
                     SettingsSlider(
                         title = "100問正解につき可能な視聴時間",
                         valueText = "${uiState.youtubeMinutesPer100Correct}分",
@@ -467,31 +593,86 @@ private fun ParentAdminScreen(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        OutlinedTextField(
-                            value = youtubeWifiSsid,
-                            onValueChange = { youtubeWifiSsid = it },
-                            modifier = Modifier.weight(1f),
-                            label = { Text("SSID") },
-                            singleLine = true,
+                        Text(
+                            text = if (youtubeWifiSsid.isBlank()) "SSID未選択" else youtubeWifiSsid,
+                            modifier = Modifier.weight(0.9f),
+                            color = if (youtubeWifiSsid.isBlank()) {
+                                MaterialTheme.colorScheme.error
+                            } else {
+                                MaterialTheme.colorScheme.onSurface
+                            },
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                         )
+                        OutlinedButton(
+                            onClick = {
+                                if (!hasWifiPermission) {
+                                    permissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+                                    wifiSettingsMessage = "SSID取得には位置情報権限が必要です。"
+                                } else {
+                                    wifiSsidOptions = context.availableWifiSsids()
+                                    showWifiSsidDialog = true
+                                    wifiSettingsMessage = if (wifiSsidOptions.isEmpty()) {
+                                        "SSIDを取得できませんでした。端末のWiFi設定と位置情報を確認してください。"
+                                    } else {
+                                        "${wifiSsidOptions.size}件のSSIDを取得しました。"
+                                    }
+                                }
+                            },
+                            modifier = Modifier.height(56.dp),
+                            shape = RoundedCornerShape(8.dp),
+                        ) {
+                            Text(text = "SSID取得", fontWeight = FontWeight.Bold)
+                        }
                         OutlinedTextField(
                             value = youtubeWifiPassword,
-                            onValueChange = { youtubeWifiPassword = it },
+                            onValueChange = {
+                                youtubeWifiPassword = it
+                                wifiPasswordConfirmed = false
+                            },
                             modifier = Modifier.weight(1f),
-                            label = { Text("WiFiパスワード") },
+                            label = {
+                                Text(if (wifiPasswordConfirmed) "WiFiパスワード ✅" else "WiFiパスワード")
+                            },
                             singleLine = true,
                             visualTransformation = PasswordVisualTransformation(),
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                         )
+                        OutlinedButton(
+                            onClick = {
+                                if (youtubeWifiSsid.isBlank()) {
+                                    wifiSettingsMessage = "SSIDを選択してください。"
+                                } else if (!hasWifiPermission) {
+                                    permissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+                                    wifiSettingsMessage = "接続確認には位置情報権限が必要です。"
+                                } else {
+                                    wifiPasswordConfirmed = false
+                                    wifiTestTarget = youtubeWifiSsid to youtubeWifiPassword
+                                }
+                            },
+                            modifier = Modifier.height(56.dp),
+                            shape = RoundedCornerShape(8.dp),
+                        ) {
+                            Text(text = "確認", fontWeight = FontWeight.Bold)
+                        }
                         Button(
                             onClick = {
                                 onSaveYoutubeWifiSettings(youtubeWifiSsid, youtubeWifiPassword)
+                                wifiSettingsMessage = "YouTube WiFi設定を保存しました。"
                             },
                             modifier = Modifier.height(56.dp),
                             shape = RoundedCornerShape(8.dp),
                         ) {
                             Text(text = "保存", fontWeight = FontWeight.Bold)
                         }
+                    }
+                    wifiSettingsMessage?.let { message ->
+                        Text(
+                            text = message,
+                            color = if (wifiPasswordConfirmed) Color(0xFF047857) else MaterialTheme.colorScheme.secondary,
+                            fontWeight = FontWeight.Bold,
+                        )
                     }
                 }
             }
@@ -587,10 +768,12 @@ private fun ParentAdminScreen(
 private fun YoutubeRewardScreen(
     uiState: KanjiUiState,
     onBack: () -> Unit,
+    onChargeableChanged: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     BackHandler(onBack = onBack)
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     var hasWifiPermission by remember(uiState.youtubeWifiSsid) {
         mutableStateOf(context.hasFineLocationPermission())
     }
@@ -611,6 +794,52 @@ private fun YoutubeRewardScreen(
     }
 
     val wifiStatus = rememberYoutubeWifiStatus(uiState, hasWifiPermission)
+    var isYoutubePageLoaded by remember { mutableStateOf(false) }
+    var showWifiConnectionAlert by remember { mutableStateOf(false) }
+
+    LaunchedEffect(wifiStatus.isYoutubeNetworkReady) {
+        isYoutubePageLoaded = false
+        showWifiConnectionAlert = false
+        if (!wifiStatus.isYoutubeNetworkReady) {
+            onChargeableChanged(false)
+        }
+    }
+    LaunchedEffect(uiState.youtubeWifiSsid, wifiStatus.isYoutubeNetworkReady) {
+        if (uiState.youtubeWifiSsid.isNotBlank() && !wifiStatus.isYoutubeNetworkReady) {
+            delay(YOUTUBE_WIFI_CONNECTION_TIMEOUT_MILLIS)
+            showWifiConnectionAlert = true
+        }
+    }
+    LaunchedEffect(wifiStatus.isYoutubeNetworkReady, isYoutubePageLoaded) {
+        onChargeableChanged(wifiStatus.isYoutubeNetworkReady && isYoutubePageLoaded)
+    }
+    DisposableEffect(Unit) {
+        onDispose { onChargeableChanged(false) }
+    }
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_STOP) {
+                onBack()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+    if (showWifiConnectionAlert) {
+        AlertDialog(
+            onDismissRequest = { showWifiConnectionAlert = false },
+            text = {
+                Text(text = "このアプリ内にある管理画面でWiFiの接続をしてください")
+            },
+            confirmButton = {
+                TextButton(onClick = { showWifiConnectionAlert = false }) {
+                    Text(text = "OK")
+                }
+            },
+        )
+    }
 
     Column(
         modifier = modifier
@@ -641,33 +870,52 @@ private fun YoutubeRewardScreen(
                 textAlign = TextAlign.End,
             )
         }
-        if (wifiStatus.isNotBlank()) {
+        if (wifiStatus.message.isNotBlank()) {
             Text(
-                text = wifiStatus,
+                text = wifiStatus.message,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Color(0xFFFFF7ED))
+                    .background(if (wifiStatus.isYoutubeNetworkReady) Color(0xFFECFDF5) else Color(0xFFFFF7ED))
                     .padding(horizontal = 12.dp, vertical = 6.dp),
-                color = Color(0xFF9A3412),
+                color = if (wifiStatus.isYoutubeNetworkReady) Color(0xFF047857) else Color(0xFF9A3412),
                 fontSize = 13.sp,
                 lineHeight = 18.sp,
                 fontWeight = FontWeight.Bold,
             )
         }
 
-        AndroidView(
-            factory = { context ->
-                WebView(context).apply {
-                    webViewClient = WebViewClient()
-                    settings.javaScriptEnabled = true
-                    settings.domStorageEnabled = true
-                    loadUrl("https://m.youtube.com/")
-                }
-            },
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f),
-        )
+        if (wifiStatus.isYoutubeNetworkReady) {
+            AndroidView(
+                factory = { context ->
+                    WebView(context).apply {
+                        webViewClient = object : WebViewClient() {
+                            override fun onPageFinished(view: WebView?, url: String?) {
+                                isYoutubePageLoaded = true
+                            }
+                        }
+                        settings.javaScriptEnabled = true
+                        settings.domStorageEnabled = true
+                        loadUrl("https://m.youtube.com/")
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = "YouTubeを開く準備をしています",
+                    color = MaterialTheme.colorScheme.secondary,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
+        }
     }
 }
 
@@ -675,14 +923,14 @@ private fun YoutubeRewardScreen(
 private fun rememberYoutubeWifiStatus(
     uiState: KanjiUiState,
     hasWifiPermission: Boolean,
-): String {
+): YoutubeWifiStatus {
     val context = LocalContext.current
     var status by remember(uiState.youtubeWifiSsid) {
         mutableStateOf(
             if (uiState.youtubeWifiSsid.isBlank()) {
-                "YouTube WiFiが未設定です。現在のネットワークで開きます。"
+                YoutubeWifiStatus("YouTube WiFiが未設定です。現在のネットワークで開きます。", isYoutubeNetworkReady = true)
             } else {
-                "WiFi接続中: ${uiState.youtubeWifiSsid}"
+                YoutubeWifiStatus("WiFi接続リクエスト中: ${uiState.youtubeWifiSsid}", isYoutubeNetworkReady = false)
             },
         )
     }
@@ -690,12 +938,13 @@ private fun rememberYoutubeWifiStatus(
     DisposableEffect(uiState.youtubeWifiSsid, uiState.youtubeWifiPassword) {
         val ssid = uiState.youtubeWifiSsid
         if (ssid.isBlank()) {
+            status = YoutubeWifiStatus("YouTube WiFiが未設定です。現在のネットワークで開きます。", isYoutubeNetworkReady = true)
             onDispose { }
         } else if (!hasWifiPermission) {
-            status = "WiFi接続には位置情報権限が必要です。"
+            status = YoutubeWifiStatus("WiFi接続には位置情報権限が必要です。", isYoutubeNetworkReady = false)
             onDispose { }
         } else if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
-            status = "この端末ではアプリからのWiFi接続リクエストに対応していません。"
+            status = YoutubeWifiStatus("この端末ではアプリからのWiFi接続リクエストに対応していません。", isYoutubeNetworkReady = false)
             onDispose { }
         } else {
             val connectivityManager = context.getSystemService(
@@ -705,26 +954,30 @@ private fun rememberYoutubeWifiStatus(
             var registered = false
             val callback = object : ConnectivityManager.NetworkCallback() {
                 override fun onAvailable(network: Network) {
+                    Log.d(SCHOOL_MATH_WIFI_TAG, "YouTube reward WiFi available: $ssid")
                     connectivityManager.bindProcessToNetwork(network)
                     mainHandler.post {
-                        status = "WiFi接続中: $ssid"
+                        status = YoutubeWifiStatus("WiFi接続中: $ssid", isYoutubeNetworkReady = true)
                     }
                 }
 
                 override fun onUnavailable() {
+                    Log.d(SCHOOL_MATH_WIFI_TAG, "YouTube reward WiFi unavailable: $ssid")
                     mainHandler.post {
-                        status = "WiFiに接続できませんでした。"
+                        status = YoutubeWifiStatus("WiFiに接続できませんでした。視聴時間は減りません。", isYoutubeNetworkReady = false)
                     }
                 }
 
                 override fun onLost(network: Network) {
+                    Log.d(SCHOOL_MATH_WIFI_TAG, "YouTube reward WiFi lost: $ssid")
                     mainHandler.post {
-                        status = "WiFi接続が切れました。"
+                        status = YoutubeWifiStatus("WiFi接続が切れました。視聴時間は減りません。", isYoutubeNetworkReady = false)
                     }
                 }
             }
 
             runCatching {
+                Log.d(SCHOOL_MATH_WIFI_TAG, "Request YouTube reward WiFi: $ssid")
                 val specifierBuilder = WifiNetworkSpecifier.Builder()
                     .setSsid(ssid)
                 if (uiState.youtubeWifiPassword.isNotBlank()) {
@@ -737,10 +990,15 @@ private fun rememberYoutubeWifiStatus(
                 connectivityManager.requestNetwork(request, callback)
                 registered = true
             }.onFailure { throwable ->
-                status = throwable.message ?: "WiFi接続リクエストを開始できませんでした。"
+                Log.d(SCHOOL_MATH_WIFI_TAG, "Failed to request YouTube reward WiFi: $ssid", throwable)
+                status = YoutubeWifiStatus(
+                    throwable.message ?: "WiFi接続リクエストを開始できませんでした。",
+                    isYoutubeNetworkReady = false,
+                )
             }
 
             onDispose {
+                Log.d(SCHOOL_MATH_WIFI_TAG, "Release YouTube reward WiFi request: $ssid")
                 connectivityManager.bindProcessToNetwork(null)
                 if (registered) {
                     runCatching { connectivityManager.unregisterNetworkCallback(callback) }
@@ -752,11 +1010,127 @@ private fun rememberYoutubeWifiStatus(
     return status
 }
 
+private data class YoutubeWifiStatus(
+    val message: String,
+    val isYoutubeNetworkReady: Boolean,
+)
+
+private const val YOUTUBE_WIFI_CONNECTION_TIMEOUT_MILLIS = 10_000L
+
 private fun Context.hasFineLocationPermission(): Boolean =
     ContextCompat.checkSelfPermission(
         this,
         Manifest.permission.ACCESS_FINE_LOCATION,
     ) == PackageManager.PERMISSION_GRANTED
+
+@Suppress("DEPRECATION")
+private fun Context.currentWifiSsid(): String? {
+    if (!hasFineLocationPermission()) return null
+    val wifiManager = applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
+    val ssid = wifiManager?.connectionInfo?.ssid
+        ?.trim()
+        ?.trim('"')
+        .orEmpty()
+    return ssid.takeIf { it.isNotBlank() && it != WifiManager.UNKNOWN_SSID }
+}
+
+@Suppress("DEPRECATION", "MissingPermission")
+private fun Context.availableWifiSsids(): List<String> {
+    if (!hasFineLocationPermission()) return emptyList()
+    val wifiManager = applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
+        ?: return emptyList()
+
+    runCatching {
+        Log.d(SCHOOL_MATH_WIFI_TAG, "Start WiFi scan for admin SSID picker")
+        wifiManager.startScan()
+    }.onFailure { throwable ->
+        Log.d(SCHOOL_MATH_WIFI_TAG, "Failed to start WiFi scan", throwable)
+    }
+
+    return wifiManager.scanResults
+        .map { it.SSID.trim() }
+        .filter { it.isNotBlank() }
+        .distinct()
+        .sorted()
+}
+
+private fun requestYoutubeWifiConnection(
+    context: Context,
+    ssid: String,
+    password: String,
+    onStatus: (String) -> Unit,
+    onConnected: (String) -> Unit,
+): () -> Unit {
+    if (ssid.isBlank()) {
+        onStatus("SSIDを選択してください。")
+        return {}
+    }
+    if (!context.hasFineLocationPermission()) {
+        onStatus("WiFi接続には位置情報権限が必要です。")
+        return {}
+    }
+    if (context.currentWifiSsid() == ssid) {
+        Log.d(SCHOOL_MATH_WIFI_TAG, "Already connected to requested WiFi: $ssid")
+        onConnected("接続OK: $ssid")
+        return {}
+    }
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+        onStatus("この端末ではアプリからのWiFi接続リクエストに対応していません。")
+        return {}
+    }
+
+    val connectivityManager = context.getSystemService(
+        Context.CONNECTIVITY_SERVICE,
+    ) as ConnectivityManager
+    val mainHandler = Handler(Looper.getMainLooper())
+    var registered = false
+    val callback = object : ConnectivityManager.NetworkCallback() {
+        override fun onAvailable(network: Network) {
+            Log.d(SCHOOL_MATH_WIFI_TAG, "Admin WiFi test available: $ssid")
+            mainHandler.post {
+                connectivityManager.bindProcessToNetwork(network)
+                onConnected("接続OK: $ssid")
+            }
+        }
+
+        override fun onUnavailable() {
+            Log.d(SCHOOL_MATH_WIFI_TAG, "Admin WiFi test unavailable: $ssid")
+            mainHandler.post { onStatus("接続できませんでした: $ssid") }
+        }
+
+        override fun onLost(network: Network) {
+            Log.d(SCHOOL_MATH_WIFI_TAG, "Admin WiFi test lost: $ssid")
+            mainHandler.post { onStatus("接続が切れました: $ssid") }
+        }
+    }
+
+    runCatching {
+        Log.d(SCHOOL_MATH_WIFI_TAG, "Request admin WiFi test: $ssid")
+        val specifierBuilder = WifiNetworkSpecifier.Builder().setSsid(ssid)
+        if (password.isNotBlank()) {
+            specifierBuilder.setWpa2Passphrase(password)
+        }
+        val request = NetworkRequest.Builder()
+            .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
+            .setNetworkSpecifier(specifierBuilder.build())
+            .build()
+        connectivityManager.requestNetwork(request, callback)
+        registered = true
+    }.onFailure { throwable ->
+        Log.d(SCHOOL_MATH_WIFI_TAG, "Failed to request admin WiFi test: $ssid", throwable)
+        onStatus(throwable.message ?: "WiFi接続リクエストを開始できませんでした。")
+    }
+
+    return {
+        Log.d(SCHOOL_MATH_WIFI_TAG, "Release admin WiFi test request: $ssid")
+        connectivityManager.bindProcessToNetwork(null)
+        if (registered) {
+            runCatching { connectivityManager.unregisterNetworkCallback(callback) }
+        }
+    }
+}
+
+private const val SCHOOL_MATH_WIFI_TAG = "SchoolMathWifi"
 
 @Composable
 private fun HistoryScreen(

@@ -26,6 +26,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
+import java.io.File
 import java.security.MessageDigest
 import java.security.SecureRandom
 import kotlin.coroutines.resume
@@ -171,10 +172,12 @@ data class KanjiUiState(
     val isParentPasswordConfigured: Boolean = false,
     val parentAuthError: String? = null,
     val parentPasswordMessage: String? = null,
-    val youtubeMinutesPer100Correct: Int = 15,
+    val youtubeMinutesPer100Correct: Int = 30,
     val youtubeRewardTotalScore: Int = 0,
     val youtubeRewardAvailableSeconds: Int = 0,
     val isYoutubeRewardVisible: Boolean = false,
+    val isYoutubeInAppEnabled: Boolean = true,
+    val isYoutubeRewardChargeable: Boolean = false,
     val gradeProgress: List<KanjiGradeProgress> = emptyList(),
     val enabledGrades: Set<Int> = (1..6).toSet(),
     val youtubeWifiSsid: String = "",
@@ -323,6 +326,7 @@ class KanjiViewModel(
             youtubeMinutesPer100Correct = initialSettings.youtubeMinutesPer100Correct,
             youtubeRewardTotalScore = initialHistory.totalRewardScore(),
             youtubeRewardAvailableSeconds = youtubeRewardAvailableSeconds(initialHistory, initialSettings),
+            isYoutubeInAppEnabled = initialSettings.isYoutubeInAppEnabled,
             gradeProgress = buildGradeProgress(initialSettings.gradeSolvedCounts),
             enabledGrades = initialEnabledGrades,
             youtubeWifiSsid = initialSettings.youtubeWifiSsid,
@@ -413,6 +417,24 @@ class KanjiViewModel(
         }
     }
 
+    fun setYoutubeInAppEnabled(enabled: Boolean) {
+        settingsStore.saveYoutubeInAppEnabled(enabled)
+        if (!enabled) {
+            if (uiState.value.isYoutubeRewardChargeable) {
+                reconcileYoutubeRewardUsage()
+            }
+            youtubeRewardTimerJob?.cancel()
+            youtubeRewardTimerJob = null
+        }
+        _uiState.update {
+            it.copy(
+                isYoutubeInAppEnabled = enabled,
+                isYoutubeRewardVisible = if (enabled) it.isYoutubeRewardVisible else false,
+                isYoutubeRewardChargeable = if (enabled) it.isYoutubeRewardChargeable else false,
+            )
+        }
+    }
+
     fun saveYoutubeWifiSettings(ssid: String, password: String) {
         val safeSsid = ssid.trim()
         settingsStore.saveYoutubeWifiSettings(safeSsid, password)
@@ -426,7 +448,7 @@ class KanjiViewModel(
 
     fun startYoutubeRewardSession() {
         reconcileYoutubeRewardUsage()
-        if (uiState.value.youtubeRewardAvailableSeconds <= 0) return
+        if (!uiState.value.isYoutubeInAppEnabled || uiState.value.youtubeRewardAvailableSeconds <= 0) return
         readingTimerJob?.cancel()
         readingScreenActive = false
         _uiState.update {
@@ -435,16 +457,35 @@ class KanjiViewModel(
                 isHistoryVisible = false,
                 isParentAdminVisible = false,
                 selectedHistoryEntry = null,
+                isYoutubeRewardChargeable = false,
             )
         }
         startYoutubeRewardTimer()
     }
 
     fun hideYoutubeReward() {
+        if (uiState.value.isYoutubeRewardChargeable) {
+            reconcileYoutubeRewardUsage()
+        }
         youtubeRewardTimerJob?.cancel()
         youtubeRewardTimerJob = null
         _uiState.update {
-            it.copy(isYoutubeRewardVisible = false)
+            it.copy(
+                isYoutubeRewardVisible = false,
+                isYoutubeRewardChargeable = false,
+            )
+        }
+    }
+
+    fun setYoutubeRewardChargeable(chargeable: Boolean) {
+        val wasChargeable = uiState.value.isYoutubeRewardChargeable
+        if (chargeable && !wasChargeable) {
+            settingsStore.saveYoutubeRewardStartedAtMillis(System.currentTimeMillis())
+        } else if (!chargeable && wasChargeable) {
+            reconcileYoutubeRewardUsage()
+        }
+        _uiState.update {
+            it.copy(isYoutubeRewardChargeable = chargeable && it.isYoutubeRewardVisible)
         }
     }
 
@@ -469,6 +510,7 @@ class KanjiViewModel(
         youtubeRewardTimerJob = viewModelScope.launch {
             while (uiState.value.isYoutubeRewardVisible) {
                 delay(1_000)
+                if (!uiState.value.isYoutubeRewardChargeable) continue
                 val settings = settingsStore.loadSettings()
                 val historyEntries = historyStore.loadHistory()
                 val availableSeconds = youtubeRewardAvailableSeconds(historyEntries, settings)
@@ -476,9 +518,11 @@ class KanjiViewModel(
                     settingsStore.saveYoutubeRewardUsedSeconds(
                         settings.youtubeRewardUsedSeconds + availableSeconds.coerceAtLeast(0),
                     )
+                    settingsStore.saveYoutubeRewardStartedAtMillis(0L)
                     _uiState.update {
                         it.copy(
                             isYoutubeRewardVisible = false,
+                            isYoutubeRewardChargeable = false,
                             youtubeRewardTotalScore = historyEntries.totalRewardScore(),
                             youtubeRewardAvailableSeconds = 0,
                         )
@@ -487,6 +531,7 @@ class KanjiViewModel(
                 }
 
                 settingsStore.saveYoutubeRewardUsedSeconds(settings.youtubeRewardUsedSeconds + 1)
+                settingsStore.saveYoutubeRewardStartedAtMillis(System.currentTimeMillis())
                 _uiState.update {
                     it.copy(
                         youtubeRewardTotalScore = historyEntries.totalRewardScore(),
@@ -656,6 +701,7 @@ class KanjiViewModel(
                 youtubeMinutesPer100Correct = settings.youtubeMinutesPer100Correct,
                 youtubeRewardTotalScore = historyEntries.totalRewardScore(),
                 youtubeRewardAvailableSeconds = youtubeRewardAvailableSeconds(historyEntries, settings),
+                isYoutubeInAppEnabled = settings.isYoutubeInAppEnabled,
                 gradeProgress = buildGradeProgress(settings.gradeSolvedCounts),
                 youtubeWifiSsid = settings.youtubeWifiSsid,
                 youtubeWifiPassword = settings.youtubeWifiPassword,
@@ -1310,6 +1356,7 @@ data class KanjiSettings(
     val youtubeMinutesPer100Correct: Int = 30,
     val youtubeRewardUsedSeconds: Int = 0,
     val youtubeRewardStartedAtMillis: Long = 0L,
+    val isYoutubeInAppEnabled: Boolean = true,
     val gradeSolvedCounts: Map<Int, Int> = emptyMap(),
     val enabledGrades: Set<Int> = (1..6).toSet(),
     val youtubeWifiSsid: String = "",
@@ -1325,6 +1372,7 @@ interface KanjiSettingsStore {
     fun saveYoutubeMinutesPer100Correct(minutes: Int)
     fun saveYoutubeRewardUsedSeconds(seconds: Int)
     fun saveYoutubeRewardStartedAtMillis(startedAtMillis: Long)
+    fun saveYoutubeInAppEnabled(enabled: Boolean)
     fun addSolvedQuestions(grade: Int, solvedCount: Int)
     fun saveEnabledGrades(enabledGrades: Set<Int>)
     fun saveYoutubeWifiSettings(ssid: String, password: String)
@@ -1585,10 +1633,11 @@ class SharedPreferencesKanjiSettingsStore(
             parentPasswordSalt = sharedPreferences.getString(KEY_PARENT_PASSWORD_SALT, null).orEmpty(),
             parentPasswordHash = sharedPreferences.getString(KEY_PARENT_PASSWORD_HASH, null).orEmpty(),
             youtubeMinutesPer100Correct = sharedPreferences
-                .getInt(KEY_YOUTUBE_MINUTES_PER_100_CORRECT, 15)
+                .getInt(KEY_YOUTUBE_MINUTES_PER_100_CORRECT, 30)
                 .coerceIn(0, 120),
             youtubeRewardUsedSeconds = sharedPreferences.getInt(KEY_YOUTUBE_REWARD_USED_SECONDS, 0).coerceAtLeast(0),
             youtubeRewardStartedAtMillis = sharedPreferences.getLong(KEY_YOUTUBE_REWARD_STARTED_AT_MILLIS, 0L),
+            isYoutubeInAppEnabled = sharedPreferences.getBoolean(KEY_YOUTUBE_IN_APP_ENABLED, true),
             gradeSolvedCounts = (1..6).associateWith { grade ->
                 sharedPreferences.getInt(gradeSolvedCountKey(grade), 0).coerceAtLeast(0)
             },
@@ -1642,6 +1691,12 @@ class SharedPreferencesKanjiSettingsStore(
             .apply()
     }
 
+    override fun saveYoutubeInAppEnabled(enabled: Boolean) {
+        sharedPreferences.edit()
+            .putBoolean(KEY_YOUTUBE_IN_APP_ENABLED, enabled)
+            .apply()
+    }
+
     override fun addSolvedQuestions(grade: Int, solvedCount: Int) {
         if (solvedCount <= 0) return
 
@@ -1677,12 +1732,156 @@ class SharedPreferencesKanjiSettingsStore(
         const val KEY_YOUTUBE_MINUTES_PER_100_CORRECT = "youtube_minutes_per_100_correct"
         const val KEY_YOUTUBE_REWARD_USED_SECONDS = "youtube_reward_used_seconds"
         const val KEY_YOUTUBE_REWARD_STARTED_AT_MILLIS = "youtube_reward_started_at_millis"
+        const val KEY_YOUTUBE_IN_APP_ENABLED = "youtube_in_app_enabled"
         const val KEY_ENABLED_GRADES = "enabled_grades"
         const val KEY_YOUTUBE_WIFI_SSID = "youtube_wifi_ssid"
         const val KEY_YOUTUBE_WIFI_PASSWORD = "youtube_wifi_password"
 
         fun gradeSolvedCountKey(grade: Int): String = "grade_${grade}_solved_count"
     }
+}
+
+class FileBackedKanjiSettingsStore(
+    private val delegate: KanjiSettingsStore,
+    private val settingsFile: File,
+) : KanjiSettingsStore {
+    override fun loadSettings(): KanjiSettings {
+        val fileSettings = settingsFile.readKanjiSettingsOrNull()
+        if (fileSettings != null) return fileSettings
+
+        return delegate.loadSettings().also(::saveSettingsFile)
+    }
+
+    override fun saveSelectedGrade(selectedGrade: Int) {
+        delegate.saveSelectedGrade(selectedGrade)
+        syncSettingsFile()
+    }
+
+    override fun saveQuestionCount(questionCount: Int) {
+        delegate.saveQuestionCount(questionCount)
+        syncSettingsFile()
+    }
+
+    override fun saveReadingSecondsPerQuestion(readingSecondsPerQuestion: Int) {
+        delegate.saveReadingSecondsPerQuestion(readingSecondsPerQuestion)
+        syncSettingsFile()
+    }
+
+    override fun saveParentPasswordHash(salt: String, hash: String) {
+        delegate.saveParentPasswordHash(salt, hash)
+        syncSettingsFile()
+    }
+
+    override fun saveYoutubeMinutesPer100Correct(minutes: Int) {
+        delegate.saveYoutubeMinutesPer100Correct(minutes)
+        syncSettingsFile()
+    }
+
+    override fun saveYoutubeRewardUsedSeconds(seconds: Int) {
+        delegate.saveYoutubeRewardUsedSeconds(seconds)
+        syncSettingsFile()
+    }
+
+    override fun saveYoutubeRewardStartedAtMillis(startedAtMillis: Long) {
+        delegate.saveYoutubeRewardStartedAtMillis(startedAtMillis)
+        syncSettingsFile()
+    }
+
+    override fun saveYoutubeInAppEnabled(enabled: Boolean) {
+        delegate.saveYoutubeInAppEnabled(enabled)
+        syncSettingsFile()
+    }
+
+    override fun addSolvedQuestions(grade: Int, solvedCount: Int) {
+        delegate.addSolvedQuestions(grade, solvedCount)
+        syncSettingsFile()
+    }
+
+    override fun saveEnabledGrades(enabledGrades: Set<Int>) {
+        delegate.saveEnabledGrades(enabledGrades)
+        syncSettingsFile()
+    }
+
+    override fun saveYoutubeWifiSettings(ssid: String, password: String) {
+        delegate.saveYoutubeWifiSettings(ssid, password)
+        syncSettingsFile()
+    }
+
+    private fun syncSettingsFile() {
+        saveSettingsFile(delegate.loadSettings())
+    }
+
+    private fun saveSettingsFile(settings: KanjiSettings) {
+        runCatching {
+            settingsFile.parentFile?.mkdirs()
+            settingsFile.writeText(settings.toJson().toString())
+        }
+    }
+}
+
+private fun File.readKanjiSettingsOrNull(): KanjiSettings? =
+    runCatching {
+        if (!exists()) return@runCatching null
+        JSONObject(readText()).toKanjiSettings()
+    }.getOrNull()
+
+private fun KanjiSettings.toJson(): JSONObject =
+    JSONObject()
+        .put("selectedGrade", selectedGrade)
+        .put("questionCount", questionCount)
+        .put("readingSecondsPerQuestion", readingSecondsPerQuestion)
+        .put("parentPasswordSalt", parentPasswordSalt)
+        .put("parentPasswordHash", parentPasswordHash)
+        .put("youtubeMinutesPer100Correct", youtubeMinutesPer100Correct)
+        .put("youtubeRewardUsedSeconds", youtubeRewardUsedSeconds)
+        .put("youtubeRewardStartedAtMillis", youtubeRewardStartedAtMillis)
+        .put("isYoutubeInAppEnabled", isYoutubeInAppEnabled)
+        .put("gradeSolvedCounts", gradeSolvedCounts.toGradeSolvedCountsJson())
+        .put("enabledGrades", enabledGrades.sanitizedEnabledGrades().toIntJsonArray())
+        .put("youtubeWifiSsid", youtubeWifiSsid)
+        .put("youtubeWifiPassword", youtubeWifiPassword)
+
+private fun JSONObject.toKanjiSettings(): KanjiSettings =
+    KanjiSettings(
+        selectedGrade = optInt("selectedGrade", 1).coerceIn(1, 6),
+        questionCount = optInt("questionCount", 10).coerceIn(5, 100),
+        readingSecondsPerQuestion = optInt("readingSecondsPerQuestion", 10).toReadingTimerSeconds(),
+        parentPasswordSalt = optString("parentPasswordSalt").orEmpty(),
+        parentPasswordHash = optString("parentPasswordHash").orEmpty(),
+        youtubeMinutesPer100Correct = optInt("youtubeMinutesPer100Correct", 30).coerceIn(0, 120),
+        youtubeRewardUsedSeconds = optInt("youtubeRewardUsedSeconds", 0).coerceAtLeast(0),
+        youtubeRewardStartedAtMillis = optLong("youtubeRewardStartedAtMillis", 0L).coerceAtLeast(0L),
+        isYoutubeInAppEnabled = optBoolean("isYoutubeInAppEnabled", true),
+        gradeSolvedCounts = optJSONObject("gradeSolvedCounts").toGradeSolvedCounts(),
+        enabledGrades = optJSONArray("enabledGrades").toEnabledGradesSet(),
+        youtubeWifiSsid = optString("youtubeWifiSsid").orEmpty(),
+        youtubeWifiPassword = optString("youtubeWifiPassword").orEmpty(),
+    )
+
+private fun Map<Int, Int>.toGradeSolvedCountsJson(): JSONObject =
+    JSONObject().also { json ->
+        (1..6).forEach { grade ->
+            json.put(grade.toString(), (this[grade] ?: 0).coerceAtLeast(0))
+        }
+    }
+
+private fun JSONObject?.toGradeSolvedCounts(): Map<Int, Int> =
+    (1..6).associateWith { grade ->
+        this?.optInt(grade.toString(), 0)?.coerceAtLeast(0) ?: 0
+    }
+
+private fun Set<Int>.toIntJsonArray(): JSONArray =
+    JSONArray().also { jsonArray ->
+        forEach { jsonArray.put(it) }
+    }
+
+private fun JSONArray?.toEnabledGradesSet(): Set<Int> {
+    if (this == null) return (1..6).toSet()
+    return buildSet {
+        for (index in 0 until length()) {
+            add(optInt(index))
+        }
+    }.sanitizedEnabledGrades()
 }
 
 private class InMemoryKanjiSettingsStore : KanjiSettingsStore {
@@ -1721,6 +1920,10 @@ private class InMemoryKanjiSettingsStore : KanjiSettingsStore {
 
     override fun saveYoutubeRewardStartedAtMillis(startedAtMillis: Long) {
         settings = settings.copy(youtubeRewardStartedAtMillis = startedAtMillis.coerceAtLeast(0L))
+    }
+
+    override fun saveYoutubeInAppEnabled(enabled: Boolean) {
+        settings = settings.copy(isYoutubeInAppEnabled = enabled)
     }
 
     override fun addSolvedQuestions(grade: Int, solvedCount: Int) {
