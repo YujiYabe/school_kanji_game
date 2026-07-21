@@ -1,8 +1,25 @@
 package com.example.schoolkanjigame.kanji
 
+import android.Manifest
+import android.content.Context
+import android.content.pm.PackageManager
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
+import android.net.NetworkRequest
+import android.net.wifi.WifiNetworkSpecifier
+import android.os.Build
+import android.os.Handler
+import android.os.Looper
+import android.webkit.WebView
+import android.webkit.WebViewClient
+import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -31,6 +48,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
@@ -38,6 +56,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -51,16 +70,21 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.core.content.ContextCompat
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.TextUnit
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -80,12 +104,16 @@ fun KanjiScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
 
     DisposableEffect(lifecycleOwner, uiState.mode, uiState.isFinished) {
+        viewModel.reconcileYoutubeRewardUsage()
         viewModel.setReadingScreenActive(
             lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED),
         )
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
-                Lifecycle.Event.ON_START -> viewModel.setReadingScreenActive(true)
+                Lifecycle.Event.ON_START -> {
+                    viewModel.reconcileYoutubeRewardUsage()
+                    viewModel.setReadingScreenActive(true)
+                }
                 Lifecycle.Event.ON_STOP -> viewModel.setReadingScreenActive(false)
                 else -> Unit
             }
@@ -114,6 +142,23 @@ fun KanjiScreen(
                 modifier = Modifier.padding(paddingValues),
             )
 
+            uiState.isParentAdminVisible -> ParentAdminScreen(
+                uiState = uiState,
+                onGradeEnabledChanged = viewModel::setGradeEnabled,
+                onYoutubeMinutesPer100CorrectChanged = viewModel::setYoutubeMinutesPer100Correct,
+                onSaveYoutubeWifiSettings = viewModel::saveYoutubeWifiSettings,
+                onUnlock = viewModel::unlockParentAdmin,
+                onSavePassword = viewModel::saveParentPassword,
+                onBack = viewModel::hideParentAdmin,
+                modifier = Modifier.padding(paddingValues),
+            )
+
+            uiState.isYoutubeRewardVisible -> YoutubeRewardScreen(
+                uiState = uiState,
+                onBack = viewModel::hideYoutubeReward,
+                modifier = Modifier.padding(paddingValues),
+            )
+
             !uiState.isSessionStarted -> StartSettingsScreen(
                 uiState = uiState,
                 onGradeSelected = viewModel::setSelectedGrade,
@@ -121,6 +166,8 @@ fun KanjiScreen(
                 onTimerChanged = viewModel::setReadingSecondsPerQuestion,
                 onStart = { viewModel.startReadingMode() },
                 onHistory = viewModel::showHistory,
+                onParentAdmin = viewModel::showParentAdmin,
+                onYoutubeReward = viewModel::startYoutubeRewardSession,
                 modifier = Modifier.padding(paddingValues),
             )
 
@@ -157,6 +204,8 @@ private fun StartSettingsScreen(
     onTimerChanged: (Int) -> Unit,
     onStart: () -> Unit,
     onHistory: () -> Unit,
+    onParentAdmin: () -> Unit,
+    onYoutubeReward: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val scrollState = rememberScrollState()
@@ -189,7 +238,7 @@ private fun StartSettingsScreen(
                 verticalArrangement = Arrangement.spacedBy(22.dp),
             ) {
                 Text(
-                    text = "メニュー",
+                    text = "漢字ゲーム",
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Black,
                     color = Color(0xFF16408F),
@@ -197,11 +246,13 @@ private fun StartSettingsScreen(
 
                 GradeSelector(
                     selectedGrade = uiState.selectedGrade,
+                    enabledGrades = uiState.enabledGrades,
+                    columns = 6,
                     onGradeSelected = onGradeSelected,
                 )
 
                 SettingsSlider(
-                    title = "timer",
+                    title = "タイマー",
                     valueText = uiState.readingSecondsPerQuestion.formatTimerText(),
                     value = uiState.readingSecondsPerQuestion,
                     valueRange = 10..180,
@@ -211,7 +262,7 @@ private fun StartSettingsScreen(
                 )
 
                 SettingsSlider(
-                    title = "questions",
+                    title = "問題数",
                     valueText = "${uiState.questionCount}問",
                     value = uiState.questionCount,
                     valueRange = 5..100,
@@ -243,10 +294,469 @@ private fun StartSettingsScreen(
                 ) {
                     Text(text = "履歴", fontSize = 18.sp, fontWeight = FontWeight.Bold)
                 }
+
+                Button(
+                    onClick = onYoutubeReward,
+                    enabled = uiState.youtubeRewardAvailableSeconds > 0,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(58.dp),
+                    shape = RoundedCornerShape(8.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFFFF0033),
+                        contentColor = Color.White,
+                    ),
+                ) {
+                    Text(
+                        text = "YouTube ${uiState.youtubeRewardAvailableSeconds.formatRewardTimeText()}",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Black,
+                    )
+                }
+
+                OutlinedButton(
+                    onClick = onParentAdmin,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(54.dp),
+                    shape = RoundedCornerShape(8.dp),
+                ) {
+                    Text(text = "管理画面", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                }
             }
         }
     }
 }
+
+@Composable
+private fun ParentAdminScreen(
+    uiState: KanjiUiState,
+    onGradeEnabledChanged: (Int, Boolean) -> Unit,
+    onYoutubeMinutesPer100CorrectChanged: (Int) -> Unit,
+    onSaveYoutubeWifiSettings: (String, String) -> Unit,
+    onUnlock: (String) -> Unit,
+    onSavePassword: (String, String) -> Boolean,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var password by remember { mutableStateOf("") }
+    var currentPassword by remember { mutableStateOf("") }
+    var newPassword by remember { mutableStateOf("") }
+    var confirmPassword by remember { mutableStateOf("") }
+    var localPasswordError by remember { mutableStateOf<String?>(null) }
+    var youtubeWifiSsid by remember(uiState.youtubeWifiSsid) { mutableStateOf(uiState.youtubeWifiSsid) }
+    var youtubeWifiPassword by remember(uiState.youtubeWifiPassword) {
+        mutableStateOf(uiState.youtubeWifiPassword)
+    }
+
+    LazyColumn(
+        modifier = modifier
+            .fillMaxSize()
+            .navigationBarsPadding(),
+        contentPadding = PaddingValues(20.dp),
+        verticalArrangement = Arrangement.spacedBy(18.dp),
+    ) {
+        item(key = "admin-header") {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                OutlinedButton(
+                    onClick = onBack,
+                    shape = RoundedCornerShape(8.dp),
+                ) {
+                    Text(text = "戻る", fontWeight = FontWeight.Bold)
+                }
+                Text(
+                    text = "管理画面",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Black,
+                )
+            }
+        }
+
+        if (!uiState.isParentAuthenticated) {
+            item(key = "admin-password-unlock") {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Text(
+                            text = "パスワードを入力してください",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Black,
+                        )
+                        OutlinedTextField(
+                            value = password,
+                            onValueChange = { password = it },
+                            modifier = Modifier.fillMaxWidth(),
+                            label = { Text("パスワード") },
+                            singleLine = true,
+                            visualTransformation = PasswordVisualTransformation(),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                        )
+                        uiState.parentAuthError?.let { message ->
+                            Text(
+                                text = message,
+                                color = MaterialTheme.colorScheme.error,
+                                fontWeight = FontWeight.Bold,
+                            )
+                        }
+                        Button(
+                            onClick = { onUnlock(password) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(52.dp),
+                            shape = RoundedCornerShape(8.dp),
+                        ) {
+                            Text(text = "開く", fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+            return@LazyColumn
+        }
+
+        item(key = "admin-settings") {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(8.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant,
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(18.dp),
+                ) {
+                    EnabledGradeSelector(
+                        enabledGrades = uiState.enabledGrades,
+                        gradeProgress = uiState.gradeProgress,
+                        onGradeEnabledChanged = onGradeEnabledChanged,
+                    )
+
+                    SettingsSlider(
+                        title = "100問正解につき可能な視聴時間",
+                        valueText = "${uiState.youtubeMinutesPer100Correct}分",
+                        value = uiState.youtubeMinutesPer100Correct,
+                        valueRange = 0..120,
+                        steps = 23,
+                        stepSize = 5,
+                        onValueChanged = onYoutubeMinutesPer100CorrectChanged,
+                    )
+
+                    Text(
+                        text = "総得点 ${uiState.youtubeRewardTotalScore}点 / YouTube残り ${uiState.youtubeRewardAvailableSeconds.formatRewardTimeText()}",
+                        color = MaterialTheme.colorScheme.primary,
+                        fontSize = 16.sp,
+                        lineHeight = 22.sp,
+                        fontWeight = FontWeight.Black,
+                    )
+
+                    Text(
+                        text = "YouTube WiFi",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Black,
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        OutlinedTextField(
+                            value = youtubeWifiSsid,
+                            onValueChange = { youtubeWifiSsid = it },
+                            modifier = Modifier.weight(1f),
+                            label = { Text("SSID") },
+                            singleLine = true,
+                        )
+                        OutlinedTextField(
+                            value = youtubeWifiPassword,
+                            onValueChange = { youtubeWifiPassword = it },
+                            modifier = Modifier.weight(1f),
+                            label = { Text("WiFiパスワード") },
+                            singleLine = true,
+                            visualTransformation = PasswordVisualTransformation(),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                        )
+                        Button(
+                            onClick = {
+                                onSaveYoutubeWifiSettings(youtubeWifiSsid, youtubeWifiPassword)
+                            },
+                            modifier = Modifier.height(56.dp),
+                            shape = RoundedCornerShape(8.dp),
+                        ) {
+                            Text(text = "保存", fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+        }
+
+        item(key = "admin-password-change") {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(8.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant,
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Text(
+                        text = if (uiState.isParentPasswordConfigured) "パスワード変更" else "パスワード設定",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Black,
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        OutlinedTextField(
+                            value = currentPassword,
+                            onValueChange = { currentPassword = it.filter(Char::isDigit) },
+                            modifier = Modifier.weight(1f),
+                            label = { Text("現在") },
+                            singleLine = true,
+                            visualTransformation = PasswordVisualTransformation(),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                        )
+                        OutlinedTextField(
+                            value = newPassword,
+                            onValueChange = { newPassword = it.filter(Char::isDigit) },
+                            modifier = Modifier.weight(1f),
+                            label = { Text("新規") },
+                            singleLine = true,
+                            visualTransformation = PasswordVisualTransformation(),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                        )
+                        OutlinedTextField(
+                            value = confirmPassword,
+                            onValueChange = { confirmPassword = it.filter(Char::isDigit) },
+                            modifier = Modifier.weight(1f),
+                            label = { Text("確認") },
+                            singleLine = true,
+                            visualTransformation = PasswordVisualTransformation(),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                        )
+                        Button(
+                            onClick = {
+                                if (newPassword != confirmPassword) {
+                                    localPasswordError = "確認用のパスワードが一致しません。"
+                                    return@Button
+                                }
+                                localPasswordError = null
+                                if (onSavePassword(currentPassword, newPassword)) {
+                                    currentPassword = ""
+                                    newPassword = ""
+                                    confirmPassword = ""
+                                }
+                            },
+                            modifier = Modifier.height(56.dp),
+                            shape = RoundedCornerShape(8.dp),
+                        ) {
+                            Text(text = "保存", fontWeight = FontWeight.Bold)
+                        }
+                    }
+                    localPasswordError?.let { message ->
+                        Text(
+                            text = message,
+                            color = MaterialTheme.colorScheme.error,
+                            fontWeight = FontWeight.Bold,
+                        )
+                    }
+                    uiState.parentPasswordMessage?.let { message ->
+                        Text(
+                            text = message,
+                            color = if (message.contains("保存")) Color(0xFF047857) else MaterialTheme.colorScheme.error,
+                            fontWeight = FontWeight.Bold,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun YoutubeRewardScreen(
+    uiState: KanjiUiState,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    BackHandler(onBack = onBack)
+    val context = LocalContext.current
+    var hasWifiPermission by remember(uiState.youtubeWifiSsid) {
+        mutableStateOf(context.hasFineLocationPermission())
+    }
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        hasWifiPermission = granted
+    }
+
+    LaunchedEffect(uiState.youtubeWifiSsid, hasWifiPermission) {
+        if (
+            uiState.youtubeWifiSsid.isNotBlank() &&
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
+            !hasWifiPermission
+        ) {
+            permissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+        }
+    }
+
+    val wifiStatus = rememberYoutubeWifiStatus(uiState, hasWifiPermission)
+
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .navigationBarsPadding(),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Color.White)
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            OutlinedButton(
+                onClick = onBack,
+                shape = RoundedCornerShape(8.dp),
+            ) {
+                Text(text = "戻る", fontWeight = FontWeight.Bold)
+            }
+            Text(
+                text = "残り ${uiState.youtubeRewardAvailableSeconds.formatRewardTimeText()}",
+                color = Color(0xFFFF0033),
+                fontSize = 20.sp,
+                lineHeight = 26.sp,
+                fontWeight = FontWeight.Black,
+                modifier = Modifier.weight(1f),
+                textAlign = TextAlign.End,
+            )
+        }
+        if (wifiStatus.isNotBlank()) {
+            Text(
+                text = wifiStatus,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color(0xFFFFF7ED))
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                color = Color(0xFF9A3412),
+                fontSize = 13.sp,
+                lineHeight = 18.sp,
+                fontWeight = FontWeight.Bold,
+            )
+        }
+
+        AndroidView(
+            factory = { context ->
+                WebView(context).apply {
+                    webViewClient = WebViewClient()
+                    settings.javaScriptEnabled = true
+                    settings.domStorageEnabled = true
+                    loadUrl("https://m.youtube.com/")
+                }
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f),
+        )
+    }
+}
+
+@Composable
+private fun rememberYoutubeWifiStatus(
+    uiState: KanjiUiState,
+    hasWifiPermission: Boolean,
+): String {
+    val context = LocalContext.current
+    var status by remember(uiState.youtubeWifiSsid) {
+        mutableStateOf(
+            if (uiState.youtubeWifiSsid.isBlank()) {
+                "YouTube WiFiが未設定です。現在のネットワークで開きます。"
+            } else {
+                "WiFi接続中: ${uiState.youtubeWifiSsid}"
+            },
+        )
+    }
+
+    DisposableEffect(uiState.youtubeWifiSsid, uiState.youtubeWifiPassword) {
+        val ssid = uiState.youtubeWifiSsid
+        if (ssid.isBlank()) {
+            onDispose { }
+        } else if (!hasWifiPermission) {
+            status = "WiFi接続には位置情報権限が必要です。"
+            onDispose { }
+        } else if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            status = "この端末ではアプリからのWiFi接続リクエストに対応していません。"
+            onDispose { }
+        } else {
+            val connectivityManager = context.getSystemService(
+                Context.CONNECTIVITY_SERVICE,
+            ) as ConnectivityManager
+            val mainHandler = Handler(Looper.getMainLooper())
+            var registered = false
+            val callback = object : ConnectivityManager.NetworkCallback() {
+                override fun onAvailable(network: Network) {
+                    connectivityManager.bindProcessToNetwork(network)
+                    mainHandler.post {
+                        status = "WiFi接続中: $ssid"
+                    }
+                }
+
+                override fun onUnavailable() {
+                    mainHandler.post {
+                        status = "WiFiに接続できませんでした。"
+                    }
+                }
+
+                override fun onLost(network: Network) {
+                    mainHandler.post {
+                        status = "WiFi接続が切れました。"
+                    }
+                }
+            }
+
+            runCatching {
+                val specifierBuilder = WifiNetworkSpecifier.Builder()
+                    .setSsid(ssid)
+                if (uiState.youtubeWifiPassword.isNotBlank()) {
+                    specifierBuilder.setWpa2Passphrase(uiState.youtubeWifiPassword)
+                }
+                val request = NetworkRequest.Builder()
+                    .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
+                    .setNetworkSpecifier(specifierBuilder.build())
+                    .build()
+                connectivityManager.requestNetwork(request, callback)
+                registered = true
+            }.onFailure { throwable ->
+                status = throwable.message ?: "WiFi接続リクエストを開始できませんでした。"
+            }
+
+            onDispose {
+                connectivityManager.bindProcessToNetwork(null)
+                if (registered) {
+                    runCatching { connectivityManager.unregisterNetworkCallback(callback) }
+                }
+            }
+        }
+    }
+
+    return status
+}
+
+private fun Context.hasFineLocationPermission(): Boolean =
+    ContextCompat.checkSelfPermission(
+        this,
+        Manifest.permission.ACCESS_FINE_LOCATION,
+    ) == PackageManager.PERMISSION_GRANTED
 
 @Composable
 private fun HistoryScreen(
@@ -516,6 +1026,8 @@ private fun HistoryDetailScreen(
 @Composable
 private fun GradeSelector(
     selectedGrade: Int,
+    enabledGrades: Set<Int> = (1..6).toSet(),
+    columns: Int = 3,
     onGradeSelected: (Int) -> Unit,
 ) {
     Column(
@@ -523,21 +1035,23 @@ private fun GradeSelector(
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Text(
-            text = "grade",
+            text = "学年",
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Black,
             color = Color(0xFF16408F),
         )
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            (1..6).chunked(3).forEach { rowGrades ->
+            (1..6).chunked(columns.coerceIn(1, 6)).forEach { rowGrades ->
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     rowGrades.forEach { grade ->
                         val selected = grade == selectedGrade
+                        val enabled = grade in enabledGrades
                         Button(
                             onClick = { onGradeSelected(grade) },
+                            enabled = enabled,
                             modifier = Modifier
                                 .weight(1f)
                                 .height(52.dp),
@@ -545,6 +1059,8 @@ private fun GradeSelector(
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = if (selected) Color(0xFF86DC23) else Color(0xFF1F73E8),
                                 contentColor = if (selected) Color(0xFF16408F) else Color.White,
+                                disabledContainerColor = Color(0xFFE5E7EB),
+                                disabledContentColor = Color(0xFF6B7280),
                             ),
                         ) {
                             Text(
@@ -552,6 +1068,79 @@ private fun GradeSelector(
                                 fontSize = 19.sp,
                                 fontWeight = FontWeight.Black,
                             )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun EnabledGradeSelector(
+    enabledGrades: Set<Int>,
+    gradeProgress: List<KanjiGradeProgress>,
+    onGradeEnabledChanged: (Int, Boolean) -> Unit,
+) {
+    val progressByGrade = remember(gradeProgress) {
+        gradeProgress.associateBy { it.grade }
+    }
+
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            text = "出題できる学年",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Black,
+            color = Color(0xFF16408F),
+        )
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            (1..6).chunked(3).forEach { rowGrades ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    rowGrades.forEach { grade ->
+                        val checked = grade in enabledGrades
+                        val canChange = !checked || enabledGrades.size > 1
+                        val progress = progressByGrade[grade]
+                        Button(
+                            onClick = {
+                                if (canChange) {
+                                    onGradeEnabledChanged(grade, !checked)
+                                }
+                            },
+                            enabled = canChange,
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(64.dp),
+                            shape = RoundedCornerShape(8.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (checked) Color(0xFF86DC23) else Color(0xFFE5E7EB),
+                                contentColor = if (checked) Color(0xFF16408F) else Color(0xFF6B7280),
+                                disabledContainerColor = Color(0xFF86DC23),
+                                disabledContentColor = Color(0xFF16408F),
+                            ),
+                        ) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(2.dp),
+                            ) {
+                                Text(
+                                    text = "${grade}年",
+                                    fontSize = 15.sp,
+                                    lineHeight = 18.sp,
+                                    fontWeight = FontWeight.Black,
+                                )
+                                Text(
+                                    text = "${progress?.solvedCount ?: 0}問 / ${progress?.achievementPercent ?: 0}%",
+                                    fontSize = 12.sp,
+                                    lineHeight = 15.sp,
+                                    fontWeight = FontWeight.Bold,
+                                )
+                            }
                         }
                     }
                 }
@@ -607,6 +1196,17 @@ private fun SettingsSlider(
 private fun Int.formatTimerText(): String {
     val minutes = this / 60
     val seconds = this % 60
+    return when {
+        minutes == 0 -> "${seconds}秒"
+        seconds == 0 -> "${minutes}分"
+        else -> "${minutes}分${seconds}秒"
+    }
+}
+
+private fun Int.formatRewardTimeText(): String {
+    val safeSeconds = coerceAtLeast(0)
+    val minutes = safeSeconds / 60
+    val seconds = safeSeconds % 60
     return when {
         minutes == 0 -> "${seconds}秒"
         seconds == 0 -> "${minutes}分"
