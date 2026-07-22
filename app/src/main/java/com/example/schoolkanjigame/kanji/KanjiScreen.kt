@@ -7,12 +7,14 @@ import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
+import android.net.Uri
 import android.net.wifi.WifiNetworkSpecifier
 import android.net.wifi.WifiManager
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.compose.BackHandler
@@ -162,6 +164,7 @@ fun KanjiScreen(
                 uiState = uiState,
                 onBack = viewModel::hideYoutubeReward,
                 onChargeableChanged = viewModel::setYoutubeRewardChargeable,
+                onYoutubePlaybackProgress = viewModel::saveYoutubePlaybackProgress,
                 modifier = Modifier.padding(paddingValues),
             )
 
@@ -769,6 +772,7 @@ private fun YoutubeRewardScreen(
     uiState: KanjiUiState,
     onBack: () -> Unit,
     onChargeableChanged: (Boolean) -> Unit,
+    onYoutubePlaybackProgress: (String, Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     BackHandler(onBack = onBack)
@@ -796,6 +800,12 @@ private fun YoutubeRewardScreen(
     val wifiStatus = rememberYoutubeWifiStatus(uiState, hasWifiPermission)
     var isYoutubePageLoaded by remember { mutableStateOf(false) }
     var showWifiConnectionAlert by remember { mutableStateOf(false) }
+    val youtubeStartUrl = remember(
+        uiState.youtubeLastPlaybackUrl,
+        uiState.youtubeLastPlaybackSeconds,
+    ) {
+        uiState.youtubeLastPlaybackUrl.toYoutubeResumeUrl(uiState.youtubeLastPlaybackSeconds)
+    }
 
     LaunchedEffect(wifiStatus.isYoutubeNetworkReady) {
         isYoutubePageLoaded = false
@@ -865,22 +875,9 @@ private fun YoutubeRewardScreen(
                 color = Color(0xFFFF0033),
                 fontSize = 20.sp,
                 lineHeight = 26.sp,
-                fontWeight = FontWeight.Black,
+                fontWeight = FontWeight.Bold,
                 modifier = Modifier.weight(1f),
                 textAlign = TextAlign.End,
-            )
-        }
-        if (wifiStatus.message.isNotBlank()) {
-            Text(
-                text = wifiStatus.message,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(if (wifiStatus.isYoutubeNetworkReady) Color(0xFFECFDF5) else Color(0xFFFFF7ED))
-                    .padding(horizontal = 12.dp, vertical = 6.dp),
-                color = if (wifiStatus.isYoutubeNetworkReady) Color(0xFF047857) else Color(0xFF9A3412),
-                fontSize = 13.sp,
-                lineHeight = 18.sp,
-                fontWeight = FontWeight.Bold,
             )
         }
 
@@ -888,14 +885,23 @@ private fun YoutubeRewardScreen(
             AndroidView(
                 factory = { context ->
                     WebView(context).apply {
+                        val mainHandler = Handler(Looper.getMainLooper())
+                        addJavascriptInterface(
+                            YoutubePlaybackProgressBridge(
+                                mainHandler = mainHandler,
+                                onProgress = onYoutubePlaybackProgress,
+                            ),
+                            YOUTUBE_PROGRESS_BRIDGE_NAME,
+                        )
                         webViewClient = object : WebViewClient() {
                             override fun onPageFinished(view: WebView?, url: String?) {
                                 isYoutubePageLoaded = true
+                                view?.injectYoutubeProgressReporter()
                             }
                         }
                         settings.javaScriptEnabled = true
                         settings.domStorageEnabled = true
-                        loadUrl("https://m.youtube.com/")
+                        loadUrl(youtubeStartUrl)
                     }
                 },
                 modifier = Modifier
@@ -1015,7 +1021,78 @@ private data class YoutubeWifiStatus(
     val isYoutubeNetworkReady: Boolean,
 )
 
+private class YoutubePlaybackProgressBridge(
+    private val mainHandler: Handler,
+    private val onProgress: (String, Int) -> Unit,
+) {
+    @JavascriptInterface
+    fun save(url: String?, seconds: Double) {
+        val safeUrl = url.orEmpty()
+        val safeSeconds = seconds.toInt().coerceAtLeast(0)
+        if (safeUrl.isBlank()) return
+        mainHandler.post {
+            onProgress(safeUrl, safeSeconds)
+        }
+    }
+}
+
+private fun WebView.injectYoutubeProgressReporter() {
+    evaluateJavascript(
+        """
+        (function() {
+          if (window.__kanjiYoutubeProgressInstalled) return;
+          window.__kanjiYoutubeProgressInstalled = true;
+          function reportProgress() {
+            try {
+              var video = document.querySelector('video');
+              if (!video || !isFinite(video.currentTime)) return;
+              $YOUTUBE_PROGRESS_BRIDGE_NAME.save(window.location.href, Math.floor(video.currentTime));
+            } catch (e) {}
+          }
+          setInterval(reportProgress, 2000);
+          window.addEventListener('pagehide', reportProgress);
+          document.addEventListener('visibilitychange', reportProgress);
+          reportProgress();
+        })();
+        """.trimIndent(),
+        null,
+    )
+}
+
+private fun String.toYoutubeResumeUrl(seconds: Int): String {
+    val safeUrl = takeIf { it.isHttpYoutubeUrl() } ?: YOUTUBE_HOME_URL
+    val safeSeconds = seconds.coerceAtLeast(0)
+    if (safeSeconds <= 0) return safeUrl
+
+    return runCatching {
+        val uri = Uri.parse(safeUrl)
+        val builder = uri.buildUpon().clearQuery()
+        uri.queryParameterNames
+            .filterNot { it == "t" || it == "start" }
+            .forEach { name ->
+                uri.getQueryParameters(name).forEach { value ->
+                    builder.appendQueryParameter(name, value)
+                }
+            }
+        builder.appendQueryParameter("t", "${safeSeconds}s").build().toString()
+    }.getOrElse {
+        val separator = if (safeUrl.contains("?")) "&" else "?"
+        "$safeUrl${separator}t=${safeSeconds}s"
+    }
+}
+
+private fun String.isHttpYoutubeUrl(): Boolean =
+    runCatching {
+        val uri = Uri.parse(this)
+        val scheme = uri.scheme.orEmpty()
+        val host = uri.host.orEmpty()
+        (scheme == "http" || scheme == "https") &&
+            (host.endsWith("youtube.com") || host.endsWith("youtu.be"))
+    }.getOrDefault(false)
+
 private const val YOUTUBE_WIFI_CONNECTION_TIMEOUT_MILLIS = 10_000L
+private const val YOUTUBE_HOME_URL = "https://m.youtube.com/"
+private const val YOUTUBE_PROGRESS_BRIDGE_NAME = "KanjiYoutubeProgress"
 
 private fun Context.hasFineLocationPermission(): Boolean =
     ContextCompat.checkSelfPermission(

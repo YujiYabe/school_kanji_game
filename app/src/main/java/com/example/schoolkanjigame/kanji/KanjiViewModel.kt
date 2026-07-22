@@ -182,6 +182,8 @@ data class KanjiUiState(
     val enabledGrades: Set<Int> = (1..6).toSet(),
     val youtubeWifiSsid: String = "",
     val youtubeWifiPassword: String = "",
+    val youtubeLastPlaybackUrl: String = "",
+    val youtubeLastPlaybackSeconds: Int = 0,
 ) {
     val currentQuestion: KanjiQuestion?
         get() = questions.getOrNull(currentQuestionIndex)
@@ -331,6 +333,8 @@ class KanjiViewModel(
             enabledGrades = initialEnabledGrades,
             youtubeWifiSsid = initialSettings.youtubeWifiSsid,
             youtubeWifiPassword = initialSettings.youtubeWifiPassword,
+            youtubeLastPlaybackUrl = initialSettings.youtubeLastPlaybackUrl,
+            youtubeLastPlaybackSeconds = initialSettings.youtubeLastPlaybackSeconds,
         ),
     )
     val uiState: StateFlow<KanjiUiState> = _uiState.asStateFlow()
@@ -442,6 +446,19 @@ class KanjiViewModel(
             it.copy(
                 youtubeWifiSsid = safeSsid,
                 youtubeWifiPassword = password,
+            )
+        }
+    }
+
+    fun saveYoutubePlaybackProgress(url: String, seconds: Int) {
+        val safeUrl = url.trim()
+        val safeSeconds = seconds.coerceAtLeast(0)
+        if (safeUrl.isBlank()) return
+        settingsStore.saveYoutubePlaybackProgress(safeUrl, safeSeconds)
+        _uiState.update {
+            it.copy(
+                youtubeLastPlaybackUrl = safeUrl,
+                youtubeLastPlaybackSeconds = safeSeconds,
             )
         }
     }
@@ -1361,6 +1378,8 @@ data class KanjiSettings(
     val enabledGrades: Set<Int> = (1..6).toSet(),
     val youtubeWifiSsid: String = "",
     val youtubeWifiPassword: String = "",
+    val youtubeLastPlaybackUrl: String = "",
+    val youtubeLastPlaybackSeconds: Int = 0,
 )
 
 interface KanjiSettingsStore {
@@ -1376,6 +1395,7 @@ interface KanjiSettingsStore {
     fun addSolvedQuestions(grade: Int, solvedCount: Int)
     fun saveEnabledGrades(enabledGrades: Set<Int>)
     fun saveYoutubeWifiSettings(ssid: String, password: String)
+    fun saveYoutubePlaybackProgress(url: String, seconds: Int)
 }
 
 interface KanjiHistoryStore {
@@ -1646,6 +1666,10 @@ class SharedPreferencesKanjiSettingsStore(
                 .toEnabledGrades(),
             youtubeWifiSsid = sharedPreferences.getString(KEY_YOUTUBE_WIFI_SSID, null).orEmpty(),
             youtubeWifiPassword = sharedPreferences.getString(KEY_YOUTUBE_WIFI_PASSWORD, null).orEmpty(),
+            youtubeLastPlaybackUrl = sharedPreferences.getString(KEY_YOUTUBE_LAST_PLAYBACK_URL, null).orEmpty(),
+            youtubeLastPlaybackSeconds = sharedPreferences
+                .getInt(KEY_YOUTUBE_LAST_PLAYBACK_SECONDS, 0)
+                .coerceAtLeast(0),
         )
 
     override fun saveSelectedGrade(selectedGrade: Int) {
@@ -1723,6 +1747,13 @@ class SharedPreferencesKanjiSettingsStore(
             .apply()
     }
 
+    override fun saveYoutubePlaybackProgress(url: String, seconds: Int) {
+        sharedPreferences.edit()
+            .putString(KEY_YOUTUBE_LAST_PLAYBACK_URL, url.trim())
+            .putInt(KEY_YOUTUBE_LAST_PLAYBACK_SECONDS, seconds.coerceAtLeast(0))
+            .apply()
+    }
+
     private companion object {
         const val KEY_SELECTED_GRADE = "selected_grade"
         const val KEY_QUESTION_COUNT = "question_count"
@@ -1736,6 +1767,8 @@ class SharedPreferencesKanjiSettingsStore(
         const val KEY_ENABLED_GRADES = "enabled_grades"
         const val KEY_YOUTUBE_WIFI_SSID = "youtube_wifi_ssid"
         const val KEY_YOUTUBE_WIFI_PASSWORD = "youtube_wifi_password"
+        const val KEY_YOUTUBE_LAST_PLAYBACK_URL = "youtube_last_playback_url"
+        const val KEY_YOUTUBE_LAST_PLAYBACK_SECONDS = "youtube_last_playback_seconds"
 
         fun gradeSolvedCountKey(grade: Int): String = "grade_${grade}_solved_count"
     }
@@ -1807,6 +1840,11 @@ class FileBackedKanjiSettingsStore(
         syncSettingsFile()
     }
 
+    override fun saveYoutubePlaybackProgress(url: String, seconds: Int) {
+        delegate.saveYoutubePlaybackProgress(url, seconds)
+        syncSettingsFile()
+    }
+
     private fun syncSettingsFile() {
         saveSettingsFile(delegate.loadSettings())
     }
@@ -1840,6 +1878,8 @@ private fun KanjiSettings.toJson(): JSONObject =
         .put("enabledGrades", enabledGrades.sanitizedEnabledGrades().toIntJsonArray())
         .put("youtubeWifiSsid", youtubeWifiSsid)
         .put("youtubeWifiPassword", youtubeWifiPassword)
+        .put("youtubeLastPlaybackUrl", youtubeLastPlaybackUrl)
+        .put("youtubeLastPlaybackSeconds", youtubeLastPlaybackSeconds)
 
 private fun JSONObject.toKanjiSettings(): KanjiSettings =
     KanjiSettings(
@@ -1856,6 +1896,8 @@ private fun JSONObject.toKanjiSettings(): KanjiSettings =
         enabledGrades = optJSONArray("enabledGrades").toEnabledGradesSet(),
         youtubeWifiSsid = optString("youtubeWifiSsid").orEmpty(),
         youtubeWifiPassword = optString("youtubeWifiPassword").orEmpty(),
+        youtubeLastPlaybackUrl = optString("youtubeLastPlaybackUrl").orEmpty(),
+        youtubeLastPlaybackSeconds = optInt("youtubeLastPlaybackSeconds", 0).coerceAtLeast(0),
     )
 
 private fun Map<Int, Int>.toGradeSolvedCountsJson(): JSONObject =
@@ -1943,6 +1985,13 @@ private class InMemoryKanjiSettingsStore : KanjiSettingsStore {
         settings = settings.copy(
             youtubeWifiSsid = ssid.trim(),
             youtubeWifiPassword = password,
+        )
+    }
+
+    override fun saveYoutubePlaybackProgress(url: String, seconds: Int) {
+        settings = settings.copy(
+            youtubeLastPlaybackUrl = url.trim(),
+            youtubeLastPlaybackSeconds = seconds.coerceAtLeast(0),
         )
     }
 }

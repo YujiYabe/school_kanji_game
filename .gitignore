@@ -34,3 +34,4 @@ local.properties
 .idea/
 *.iml
 captures/
+dist/*
