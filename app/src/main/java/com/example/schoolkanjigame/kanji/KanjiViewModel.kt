@@ -507,7 +507,7 @@ class KanjiViewModel(
 
     fun startYoutubeRewardSession() {
         reconcileYoutubeRewardUsage()
-        if (!uiState.value.isYoutubeInAppEnabled || uiState.value.youtubeRewardAvailableSeconds <= 0) return
+        if (uiState.value.youtubeRewardAvailableSeconds <= 0) return
         readingTimerJob?.cancel()
         readingScreenActive = false
         _uiState.update {

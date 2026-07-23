@@ -15,4 +15,5 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "SchoolKanjiGame"
+includeBuild("../android_admin_common")
 include(":app")
