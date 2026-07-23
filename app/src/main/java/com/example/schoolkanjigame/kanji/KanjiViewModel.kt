@@ -115,6 +115,11 @@ data class KanjiGradeProgress(
         get() = if (questionPoolCount == 0) 0 else (solvedCount * 100 / questionPoolCount)
 }
 
+data class YoutubeWifiNetwork(
+    val ssid: String,
+    val password: String,
+)
+
 enum class ResultPhase {
     Final,
     RetryNeeded,
@@ -182,6 +187,7 @@ data class KanjiUiState(
     val enabledGrades: Set<Int> = (1..6).toSet(),
     val youtubeWifiSsid: String = "",
     val youtubeWifiPassword: String = "",
+    val youtubeWifiNetworks: List<YoutubeWifiNetwork> = emptyList(),
     val youtubeLastPlaybackUrl: String = "",
     val youtubeLastPlaybackSeconds: Int = 0,
 ) {
@@ -333,6 +339,7 @@ class KanjiViewModel(
             enabledGrades = initialEnabledGrades,
             youtubeWifiSsid = initialSettings.youtubeWifiSsid,
             youtubeWifiPassword = initialSettings.youtubeWifiPassword,
+            youtubeWifiNetworks = initialSettings.youtubeWifiNetworks,
             youtubeLastPlaybackUrl = initialSettings.youtubeLastPlaybackUrl,
             youtubeLastPlaybackSeconds = initialSettings.youtubeLastPlaybackSeconds,
         ),
@@ -439,13 +446,48 @@ class KanjiViewModel(
         }
     }
 
+    fun setYoutubeRewardAvailableSeconds(seconds: Int) {
+        val safeSeconds = seconds.coerceIn(0, MAX_YOUTUBE_REWARD_SECONDS)
+        youtubeRewardTimerJob?.cancel()
+        youtubeRewardTimerJob = null
+        val settings = settingsStore.loadSettings()
+        val historyEntries = historyStore.loadHistory()
+        val earnedSeconds = youtubeRewardEarnedSeconds(historyEntries, settings)
+        settingsStore.saveYoutubeRewardUsedSeconds(earnedSeconds - safeSeconds)
+        settingsStore.saveYoutubeRewardStartedAtMillis(0L)
+        refreshYoutubeRewardState()
+        _uiState.update {
+            it.copy(
+                isYoutubeRewardVisible = false,
+                isYoutubeRewardChargeable = false,
+            )
+        }
+    }
+
     fun saveYoutubeWifiSettings(ssid: String, password: String) {
         val safeSsid = ssid.trim()
         settingsStore.saveYoutubeWifiSettings(safeSsid, password)
+        val settings = settingsStore.loadSettings()
         _uiState.update {
             it.copy(
                 youtubeWifiSsid = safeSsid,
                 youtubeWifiPassword = password,
+                youtubeWifiNetworks = settings.youtubeWifiNetworks,
+            )
+        }
+    }
+
+    fun deleteYoutubeWifiSettings(ssid: String) {
+        val safeSsid = ssid.trim()
+        if (safeSsid.isBlank()) return
+
+        settingsStore.deleteYoutubeWifiSettings(safeSsid)
+        val settings = settingsStore.loadSettings()
+        _uiState.update {
+            it.copy(
+                youtubeWifiSsid = settings.youtubeWifiSsid,
+                youtubeWifiPassword = settings.youtubeWifiPassword,
+                youtubeWifiNetworks = settings.youtubeWifiNetworks,
             )
         }
     }
@@ -674,11 +716,20 @@ class KanjiViewModel(
 
     fun saveParentPassword(currentPassword: String, newPassword: String): Boolean {
         val settings = settingsStore.loadSettings()
+        if (!newPassword.all(Char::isDigit)) {
+            _uiState.update {
+                it.copy(
+                    parentAuthError = null,
+                    parentPasswordMessage = "数字だけで設定してください。",
+                )
+            }
+            return false
+        }
         if (newPassword.length < MIN_PARENT_PASSWORD_LENGTH) {
             _uiState.update {
                 it.copy(
                     parentAuthError = null,
-                    parentPasswordMessage = "${MIN_PARENT_PASSWORD_LENGTH}文字以上で設定してください。",
+                    parentPasswordMessage = "${MIN_PARENT_PASSWORD_LENGTH}桁以上で設定してください。",
                 )
             }
             return false
@@ -1378,6 +1429,7 @@ data class KanjiSettings(
     val enabledGrades: Set<Int> = (1..6).toSet(),
     val youtubeWifiSsid: String = "",
     val youtubeWifiPassword: String = "",
+    val youtubeWifiNetworks: List<YoutubeWifiNetwork> = emptyList(),
     val youtubeLastPlaybackUrl: String = "",
     val youtubeLastPlaybackSeconds: Int = 0,
 )
@@ -1395,6 +1447,7 @@ interface KanjiSettingsStore {
     fun addSolvedQuestions(grade: Int, solvedCount: Int)
     fun saveEnabledGrades(enabledGrades: Set<Int>)
     fun saveYoutubeWifiSettings(ssid: String, password: String)
+    fun deleteYoutubeWifiSettings(ssid: String)
     fun saveYoutubePlaybackProgress(url: String, seconds: Int)
 }
 
@@ -1655,7 +1708,7 @@ class SharedPreferencesKanjiSettingsStore(
             youtubeMinutesPer100Correct = sharedPreferences
                 .getInt(KEY_YOUTUBE_MINUTES_PER_100_CORRECT, 30)
                 .coerceIn(0, 120),
-            youtubeRewardUsedSeconds = sharedPreferences.getInt(KEY_YOUTUBE_REWARD_USED_SECONDS, 0).coerceAtLeast(0),
+            youtubeRewardUsedSeconds = sharedPreferences.getInt(KEY_YOUTUBE_REWARD_USED_SECONDS, 0),
             youtubeRewardStartedAtMillis = sharedPreferences.getLong(KEY_YOUTUBE_REWARD_STARTED_AT_MILLIS, 0L),
             isYoutubeInAppEnabled = sharedPreferences.getBoolean(KEY_YOUTUBE_IN_APP_ENABLED, true),
             gradeSolvedCounts = (1..6).associateWith { grade ->
@@ -1666,6 +1719,7 @@ class SharedPreferencesKanjiSettingsStore(
                 .toEnabledGrades(),
             youtubeWifiSsid = sharedPreferences.getString(KEY_YOUTUBE_WIFI_SSID, null).orEmpty(),
             youtubeWifiPassword = sharedPreferences.getString(KEY_YOUTUBE_WIFI_PASSWORD, null).orEmpty(),
+            youtubeWifiNetworks = loadYoutubeWifiNetworks(),
             youtubeLastPlaybackUrl = sharedPreferences.getString(KEY_YOUTUBE_LAST_PLAYBACK_URL, null).orEmpty(),
             youtubeLastPlaybackSeconds = sharedPreferences
                 .getInt(KEY_YOUTUBE_LAST_PLAYBACK_SECONDS, 0)
@@ -1705,7 +1759,7 @@ class SharedPreferencesKanjiSettingsStore(
 
     override fun saveYoutubeRewardUsedSeconds(seconds: Int) {
         sharedPreferences.edit()
-            .putInt(KEY_YOUTUBE_REWARD_USED_SECONDS, seconds.coerceAtLeast(0))
+            .putInt(KEY_YOUTUBE_REWARD_USED_SECONDS, seconds)
             .apply()
     }
 
@@ -1741,9 +1795,38 @@ class SharedPreferencesKanjiSettingsStore(
     }
 
     override fun saveYoutubeWifiSettings(ssid: String, password: String) {
+        val safeSsid = ssid.trim()
+        if (safeSsid.isBlank()) return
+
+        val updatedNetworks = (listOf(YoutubeWifiNetwork(safeSsid, password)) + loadYoutubeWifiNetworks())
+            .distinctBy { it.ssid }
+            .take(MAX_YOUTUBE_WIFI_NETWORK_COUNT)
         sharedPreferences.edit()
-            .putString(KEY_YOUTUBE_WIFI_SSID, ssid.trim())
+            .putString(KEY_YOUTUBE_WIFI_SSID, safeSsid)
             .putString(KEY_YOUTUBE_WIFI_PASSWORD, password)
+            .putString(KEY_YOUTUBE_WIFI_NETWORKS, updatedNetworks.toYoutubeWifiNetworksJsonArray().toString())
+            .apply()
+    }
+
+    override fun deleteYoutubeWifiSettings(ssid: String) {
+        val safeSsid = ssid.trim()
+        if (safeSsid.isBlank()) return
+
+        val updatedNetworks = loadYoutubeWifiNetworks().filterNot { it.ssid == safeSsid }
+        val selectedNetwork = sharedPreferences.getString(KEY_YOUTUBE_WIFI_SSID, null).orEmpty()
+        val fallbackNetwork = updatedNetworks.firstOrNull()
+        sharedPreferences.edit()
+            .putString(KEY_YOUTUBE_WIFI_NETWORKS, updatedNetworks.toYoutubeWifiNetworksJsonArray().toString())
+            .putString(
+                KEY_YOUTUBE_WIFI_SSID,
+                if (selectedNetwork == safeSsid) fallbackNetwork?.ssid.orEmpty() else selectedNetwork,
+            )
+            .putString(
+                KEY_YOUTUBE_WIFI_PASSWORD,
+                if (selectedNetwork == safeSsid) fallbackNetwork?.password.orEmpty() else {
+                    sharedPreferences.getString(KEY_YOUTUBE_WIFI_PASSWORD, null).orEmpty()
+                },
+            )
             .apply()
     }
 
@@ -1767,10 +1850,26 @@ class SharedPreferencesKanjiSettingsStore(
         const val KEY_ENABLED_GRADES = "enabled_grades"
         const val KEY_YOUTUBE_WIFI_SSID = "youtube_wifi_ssid"
         const val KEY_YOUTUBE_WIFI_PASSWORD = "youtube_wifi_password"
+        const val KEY_YOUTUBE_WIFI_NETWORKS = "youtube_wifi_networks"
         const val KEY_YOUTUBE_LAST_PLAYBACK_URL = "youtube_last_playback_url"
         const val KEY_YOUTUBE_LAST_PLAYBACK_SECONDS = "youtube_last_playback_seconds"
+        const val MAX_YOUTUBE_WIFI_NETWORK_COUNT = 20
 
         fun gradeSolvedCountKey(grade: Int): String = "grade_${grade}_solved_count"
+    }
+
+    private fun loadYoutubeWifiNetworks(): List<YoutubeWifiNetwork> {
+        val rawNetworks = sharedPreferences.getString(KEY_YOUTUBE_WIFI_NETWORKS, null).orEmpty()
+        val savedNetworks = rawNetworks.toYoutubeWifiNetworks()
+        val selectedSsid = sharedPreferences.getString(KEY_YOUTUBE_WIFI_SSID, null).orEmpty().trim()
+        val selectedPassword = sharedPreferences.getString(KEY_YOUTUBE_WIFI_PASSWORD, null).orEmpty()
+        val selectedNetwork = selectedSsid
+            .takeIf { it.isNotBlank() }
+            ?.let { YoutubeWifiNetwork(it, selectedPassword) }
+
+        return (listOfNotNull(selectedNetwork) + savedNetworks)
+            .distinctBy { it.ssid }
+            .take(MAX_YOUTUBE_WIFI_NETWORK_COUNT)
     }
 }
 
@@ -1840,6 +1939,11 @@ class FileBackedKanjiSettingsStore(
         syncSettingsFile()
     }
 
+    override fun deleteYoutubeWifiSettings(ssid: String) {
+        delegate.deleteYoutubeWifiSettings(ssid)
+        syncSettingsFile()
+    }
+
     override fun saveYoutubePlaybackProgress(url: String, seconds: Int) {
         delegate.saveYoutubePlaybackProgress(url, seconds)
         syncSettingsFile()
@@ -1878,6 +1982,7 @@ private fun KanjiSettings.toJson(): JSONObject =
         .put("enabledGrades", enabledGrades.sanitizedEnabledGrades().toIntJsonArray())
         .put("youtubeWifiSsid", youtubeWifiSsid)
         .put("youtubeWifiPassword", youtubeWifiPassword)
+        .put("youtubeWifiNetworks", youtubeWifiNetworks.toYoutubeWifiNetworksJsonArray())
         .put("youtubeLastPlaybackUrl", youtubeLastPlaybackUrl)
         .put("youtubeLastPlaybackSeconds", youtubeLastPlaybackSeconds)
 
@@ -1889,13 +1994,18 @@ private fun JSONObject.toKanjiSettings(): KanjiSettings =
         parentPasswordSalt = optString("parentPasswordSalt").orEmpty(),
         parentPasswordHash = optString("parentPasswordHash").orEmpty(),
         youtubeMinutesPer100Correct = optInt("youtubeMinutesPer100Correct", 30).coerceIn(0, 120),
-        youtubeRewardUsedSeconds = optInt("youtubeRewardUsedSeconds", 0).coerceAtLeast(0),
+        youtubeRewardUsedSeconds = optInt("youtubeRewardUsedSeconds", 0),
         youtubeRewardStartedAtMillis = optLong("youtubeRewardStartedAtMillis", 0L).coerceAtLeast(0L),
         isYoutubeInAppEnabled = optBoolean("isYoutubeInAppEnabled", true),
         gradeSolvedCounts = optJSONObject("gradeSolvedCounts").toGradeSolvedCounts(),
         enabledGrades = optJSONArray("enabledGrades").toEnabledGradesSet(),
         youtubeWifiSsid = optString("youtubeWifiSsid").orEmpty(),
         youtubeWifiPassword = optString("youtubeWifiPassword").orEmpty(),
+        youtubeWifiNetworks = optJSONArray("youtubeWifiNetworks")
+            .toYoutubeWifiNetworks(
+                selectedSsid = optString("youtubeWifiSsid").orEmpty(),
+                selectedPassword = optString("youtubeWifiPassword").orEmpty(),
+            ),
         youtubeLastPlaybackUrl = optString("youtubeLastPlaybackUrl").orEmpty(),
         youtubeLastPlaybackSeconds = optInt("youtubeLastPlaybackSeconds", 0).coerceAtLeast(0),
     )
@@ -1925,6 +2035,52 @@ private fun JSONArray?.toEnabledGradesSet(): Set<Int> {
         }
     }.sanitizedEnabledGrades()
 }
+
+private fun String.toYoutubeWifiNetworks(): List<YoutubeWifiNetwork> =
+    runCatching {
+        if (isBlank()) return@runCatching emptyList()
+        JSONArray(this).toYoutubeWifiNetworks()
+    }.getOrDefault(emptyList())
+
+private fun JSONArray?.toYoutubeWifiNetworks(
+    selectedSsid: String = "",
+    selectedPassword: String = "",
+): List<YoutubeWifiNetwork> {
+    val selectedNetwork = selectedSsid.trim()
+        .takeIf { it.isNotBlank() }
+        ?.let { YoutubeWifiNetwork(it, selectedPassword) }
+    if (this == null) return listOfNotNull(selectedNetwork)
+
+    val savedNetworks = buildList {
+        for (index in 0 until length()) {
+            val json = optJSONObject(index) ?: continue
+            val ssid = json.optString("ssid").trim()
+            if (ssid.isBlank()) continue
+            add(
+                YoutubeWifiNetwork(
+                    ssid = ssid,
+                    password = json.optString("password"),
+                ),
+            )
+        }
+    }
+
+    return (listOfNotNull(selectedNetwork) + savedNetworks).distinctBy { it.ssid }
+}
+
+private fun List<YoutubeWifiNetwork>.toYoutubeWifiNetworksJsonArray(): JSONArray =
+    JSONArray().also { jsonArray ->
+        forEach { network ->
+            val ssid = network.ssid.trim()
+            if (ssid.isNotBlank()) {
+                jsonArray.put(
+                    JSONObject()
+                        .put("ssid", ssid)
+                        .put("password", network.password),
+                )
+            }
+        }
+    }
 
 private class InMemoryKanjiSettingsStore : KanjiSettingsStore {
     private var settings = KanjiSettings()
@@ -1957,7 +2113,7 @@ private class InMemoryKanjiSettingsStore : KanjiSettingsStore {
     }
 
     override fun saveYoutubeRewardUsedSeconds(seconds: Int) {
-        settings = settings.copy(youtubeRewardUsedSeconds = seconds.coerceAtLeast(0))
+        settings = settings.copy(youtubeRewardUsedSeconds = seconds)
     }
 
     override fun saveYoutubeRewardStartedAtMillis(startedAtMillis: Long) {
@@ -1982,10 +2138,33 @@ private class InMemoryKanjiSettingsStore : KanjiSettingsStore {
     }
 
     override fun saveYoutubeWifiSettings(ssid: String, password: String) {
+        val safeSsid = ssid.trim()
+        if (safeSsid.isBlank()) return
+        val updatedNetworks = (listOf(YoutubeWifiNetwork(safeSsid, password)) + settings.youtubeWifiNetworks)
+            .distinctBy { it.ssid }
+            .take(20)
         settings = settings.copy(
-            youtubeWifiSsid = ssid.trim(),
+            youtubeWifiSsid = safeSsid,
             youtubeWifiPassword = password,
+            youtubeWifiNetworks = updatedNetworks,
         )
+    }
+
+    override fun deleteYoutubeWifiSettings(ssid: String) {
+        val safeSsid = ssid.trim()
+        if (safeSsid.isBlank()) return
+
+        val updatedNetworks = settings.youtubeWifiNetworks.filterNot { it.ssid == safeSsid }
+        val fallbackNetwork = updatedNetworks.firstOrNull()
+        settings = if (settings.youtubeWifiSsid == safeSsid) {
+            settings.copy(
+                youtubeWifiSsid = fallbackNetwork?.ssid.orEmpty(),
+                youtubeWifiPassword = fallbackNetwork?.password.orEmpty(),
+                youtubeWifiNetworks = updatedNetworks,
+            )
+        } else {
+            settings.copy(youtubeWifiNetworks = updatedNetworks)
+        }
     }
 
     override fun saveYoutubePlaybackProgress(url: String, seconds: Int) {
@@ -2043,9 +2222,17 @@ private fun youtubeRewardAvailableSeconds(
     historyEntries: List<KanjiHistoryEntry>,
     settings: KanjiSettings,
 ): Int {
-    val earnedSeconds = historyEntries.totalRewardScore() * settings.youtubeMinutesPer100Correct * 60 / 100
+    val earnedSeconds = youtubeRewardEarnedSeconds(historyEntries, settings)
     return (earnedSeconds - settings.youtubeRewardUsedSeconds).coerceAtLeast(0)
 }
+
+private fun youtubeRewardEarnedSeconds(
+    historyEntries: List<KanjiHistoryEntry>,
+    settings: KanjiSettings,
+): Int =
+    historyEntries.totalRewardScore() * settings.youtubeMinutesPer100Correct * 60 / 100
+
+private const val MAX_YOUTUBE_REWARD_SECONDS = 2 * 60 * 60
 
 private const val MIN_PARENT_PASSWORD_LENGTH = 4
 private const val DEFAULT_PARENT_PASSWORD = ""
